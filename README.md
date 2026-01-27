@@ -43,7 +43,7 @@ Agents are given the following REPL setup:
 | `edit_file(path, old, new)` | Edits a file in the working directory |
 | `WORKDIR` | String path to the agent's working directory |
 
-Subagents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which directly instantiates an `RLMAgent` in its own `git worktree`. Worktrees share the git object store so creating them is very fast. All agents run in-process and share a single `SandboxBudget`, so the global budget is enforced exactly. Worktrees are cleaned up after each agent completes.
+Subagents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which instantiates the `RLMAgent` in its own `git worktree`. Worktrees share the git object store so creating them is very fast. As a good practice, we clean up Worktrees after each agent finishes.
 
 ## Install
 
