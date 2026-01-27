@@ -1,35 +1,36 @@
 # rlm-claudette
 
-An RLM agent system built on [claudette](https://github.com/AnswerDotAI/claudette). This repo is meant to be a full RLM agent and a good learning tool. It implements the unlimitted recursion depth [explored by the Daytona team](https://www.daytona.io/docs/en/recursive-language-models/). 
+An RLM agent system built on [claudette](https://github.com/AnswerDotAI/claudette). It implements the unlimitted recursion depth [explored by the Daytona team](https://www.daytona.io/docs/en/recursive-language-models/). 
+
+This repo aims to be both a full, working RLM system and a good learning tool.
 
 ## Introduction 
 
 RLM agents write programs instead of calling tools. They interact with their context in a live REPL instead of keeping everything in the same context window. This lets them orchestrate subagents in a powerful recursive pattern that naturally adapts to the task at hand. 
 
-Agents can use their `rlm_query` function to spawn subagents that get their own, isolated sandbox. Subagents can *also* spawn their own subagents. This gets around a major limitation in tools like Claude Code where, as of writing, subagents cannot spawn children. In an RLM the subagent recursion stops after hitting a configured depth, or when the sandbox budget runs out.
+Agents can use their `rlm_query` function to spawn subagents that get their own, isolated sandbox. Subagents can *also* spawn their own subagents. This gets around a major limitation in tools like Claude Code where, as of writing, subagents cannot spawn children. In an RLM the subagent recursions stop when they hit a configurable depth, or when the sandbox budget runs out.
 
 ## How rlm-claudette works
 
 ```
 Root Agent (main process)
   +-- claudette.Chat for LLM calls
-  +-- REPL with injected functions (rlm_query, FINAL, edit_file)
-  +-- SandboxManager
-        +-- spawn_agent() -> subprocess (python -m rlm.subprocess_runner)
+  +-- REPL with injected functions (rlm_query, FINAL, FINAL_VAR, edit_file)
+  +-- SandboxManager (shared by all agents in-process)
+        +-- spawn_agent() -> direct RLMAgent call on a thread
         |     +-- git worktree add (fast, shared object store)
-        |     +-- passes task/config via stdin JSON
-        |     +-- child runs its own agent loop
-        |     +-- returns result via stdout JSON
-        +-- SandboxBudget (thread-safe counter)
+        |     +-- child gets its own REPL and Chat
+        |     +-- returns result string directly
+        +-- SandboxBudget (thread-safe counter, single shared instance)
 ```
 
-Each iteration does the following:
+Each iteration follows the same process:
 
-1. Builds a prompt with context from the previous execution
-2. Sends the prompt to a Claude LLM and stores its response
-3. Extracts and executes the Python code blocks from the response
-4. Checks if the agent called `FINAL()` to signal that the task is finished
-5. Formats the output for the next iteration
+1. Build a prompt with context from the previous execution
+2. Send the prompt to a Claude LLM and store its response
+3. Extract and execute the Python code blocks from the response
+4. Check if the agent called `FINAL()` to signal that the task is done
+5. Format the output for the next iteration
 
 Agents are given the following REPL setup:
 
@@ -38,9 +39,11 @@ Agents are given the following REPL setup:
 | `rlm_query(task)` | Spawns a sub-agent, returns result string |
 | `rlm_query_batched(tasks)` | Spawns multiple subagents in parallel |
 | `FINAL(answer)` | Submits the final result |
+| `FINAL_VAR(variable_name)` | Submits a REPL variable's value as the final result |
 | `edit_file(path, old, new)` | Edits a file in the working directory |
+| `WORKDIR` | String path to the agent's working directory |
 
-subagents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which creates a subprocess in its own `git worktree`. Worktrees share the git object store so creating them is very fast. As a good practice, we remove the worktress after the subprocess completes. 
+Subagents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which directly instantiates an `RLMAgent` in its own `git worktree`. Worktrees share the git object store so creating them is very fast. All agents run in-process and share a single `SandboxBudget`, so the global budget is enforced exactly. Worktrees are cleaned up after each agent completes.
 
 ## Install
 
@@ -68,9 +71,9 @@ uv run python main.py ./my-project -p "Refactor the auth module" -v
 At the end of the README, there is a working example of [rlm-claudette analyzing the official RLM repo](## Concrete example looking at a repo)
 
 
-## Why REPL, not tool-calling 
+## REPL vs. tool calling
 
-RLM agents need to write programs with loops, variables, conditional logic, etc. They must also be able to compose multiple `rlm_query` calls. While claudette has an excellent `toolloop` function that handles LLM tool calls, it only works over a fixed set of known Tools. We instead have to let the RLMs define their own "tools" via code on the fly. To that end, we use claudette's `Chat` to manage the conversation but separately extract and run the code blocks.
+RLM agents need to write programs with loops, variables, conditional logic, etc. They also need the ability to compose multiple `rlm_query` calls. While claudette has an excellent `toolloop` function for LLM tool calling, it only works over a given set of known Tools. We instead have to let the RLMs define their own "tools" via code on the fly. To that end, we use claudette's `Chat` to manage the conversation but separately extract and run the code blocks.
 
 ### CLI options
 
@@ -86,7 +89,7 @@ RLM agents need to write programs with loops, variables, conditional logic, etc.
 
 ## Agent Configuration
 
-Change these settings to control how subagents are created and how they recurse. 
+Change these settings to control how subagents are created and how they are allowed to recurse. 
 
 `config.yaml`:
 
@@ -103,7 +106,7 @@ rlm:
   max_depth: 5
 ```
 
-`max_sandboxes` is the number of total sandboxes across the entire rollout, including the root agent and all of its descendants. `max_depth` caps how deep the recursion goes. Note that subagents inherit any remaining budget, not the original amount.
+`max_sandboxes` is the number of total sandboxes across the entire rollout, including the root agent and all of its descendants. `max_depth` caps how deep the recursion goes. All agents share a single `SandboxBudget` instance in-process, so the budget is enforced globally and exactly.
 
 ## Project structure
 
@@ -117,7 +120,6 @@ rlm/
   repl.py                  # Extracts and runs code in a persistent namespace
   sandbox.py               # The SandboxBudget and SandboxManager
   prompts.py               # System and user prompts
-  subprocess_runner.py     # Entry point for child processes
 ```
 
 ## Concrete RLM analysis of a repo
