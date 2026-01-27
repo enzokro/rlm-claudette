@@ -1,12 +1,12 @@
-# Recursive Language Models: A Top-Down Tutorial
+# Tutorial on Recursive Language Models using rlm-claudette
 
-## The idea
+## The core idea
 
-An LLM agent that can spawn copies of itself. That is the whole idea behind Recursive Language Models, introduced by [Zhang, Kraska, and Khattab](https://arxiv.org/abs/2512.24601) and extended by [Prime Intellect](https://www.primeintellect.ai/blog/rlm).
+A [Recursive Language Model](https://arxiv.org/abs/2512.24601) (RLM) is an LLM agent that spawns copies of itself to solve complex tasks by breaking them down into a fan-out, recursive orchestration.
 
-Most agent systems today are either single agents with tool use, or fixed multi-agent pipelines with hardcoded roles. RLMs sit at the other end of the spectrum: a tree of agents where the root decomposes a problem, spawns children to work on the pieces in parallel, and those children spawn *their* children for sub-sub-tasks. Results flow back up through the tree. The agent decides at runtime whether to delegate, what to delegate, and how deep to go. There is no pre-defined graph. The recursion emerges from the task.
+Complex problems are broken down by a tree of agents. The root agent first decomposes the problem, then spawns children to work on different pieces in parallel. Those children then spawn *their own* children for their own sub-tasks. All results flow back up the tree. Because the agent decides at runtime how to delegate and spawn, the recursion can emerge from and adapt to the task at hand.
 
-This tutorial walks through a complete implementation built on [claudette](https://github.com/AnswerDotAI/claudette). It starts at the top (what it looks like to run the thing) and peels layers until every module is covered.
+This tutorial goes through a complete RLM implementation built on top of Answer.ai's [claudette library](https://github.com/AnswerDotAI/claudette). We start at the top by calling the RLM and seeing what it returns. Then, we slowly peel back layers until the whole system is on display.
 
 ---
 

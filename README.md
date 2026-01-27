@@ -68,7 +68,7 @@ uv run python main.py https://path/to/repo.git -p "Tell me about this repo"
 uv run python main.py ./my-project -p "Refactor the auth module" -v
 ```
 
-At the bottom of this README, there is a working example of [rlm-claudette analyzing the official RLM repo](#analyzing-the-official-rlm-repo)  
+At the bottom of this README, there is a working example of [rlm-claudette analyzing the official RLM repo](#analyzing-the-official-rlm-repo) where it even found and fixed a bug.
 
 
 ## REPL vs. tool calling
@@ -127,90 +127,132 @@ rlm/
 ```bash
 # Analyze the official RLM repo
 uv run python main.py https://github.com/alexzhang13/rlm.git \
--p "Please give me a detailed overview of how RLMs work by investigating the official RLM repo" 
+-p "Please give me an overview of RLMs by examining the official RLM repo" 
 ```
 
 ### Agent logs
 
 ```bash
-rlm: Source directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-lonxby9j
-rlm: Starting root agent...
-rlm.agent: Depth=0 Iteration=0 Response length=10794
-rlm.agent: Depth=1 Iteration=0 Response length=7058
-rlm.agent: Agent at depth=1 completed after 1 iterations
-rlm.agent: Depth=1 Iteration=0 Response length=7156
-rlm.agent: Agent at depth=1 completed after 1 iterations
-rlm.agent: Depth=1 Iteration=0 Response length=9031
-rlm.agent: Agent at depth=1 completed after 1 iterations
-rlm.agent: Depth=1 Iteration=0 Response length=10180
-rlm.agent: Agent at depth=1 completed after 1 iterations
-rlm.agent: Depth=1 Iteration=0 Response length=8013
-rlm.agent: Agent at depth=1 completed after 1 iterations
-rlm.agent: Depth=1 Iteration=0 Response length=8190
-rlm.agent: Agent at depth=1 completed after 1 iterations
-rlm.agent: Depth=1 Iteration=0 Response length=9740
-rlm.agent: Agent at depth=1 completed after 1 iterations
-rlm.agent: Depth=1 Iteration=0 Response length=13918
-rlm.agent: Agent at depth=1 completed after 1 iterations
-rlm.agent: Depth=1 Iteration=0 Response length=27503
-rlm.agent: Agent at depth=1 completed (prose fallback) after 1 iterations
-rlm.agent: Agent at depth=0 completed after 1 iterations
-rlm: Completed in 1 iterations (depth 0)
+[INFO] rlm: Source directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-d2h3egt1
+[INFO] rlm: Starting root agent...
+[INFO] rlm.agent: Depth=0 Iteration=0 Response length=13806
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=4891
+[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
+[INFO] rlm.agent: Depth=1 Iteration=1 Response length=11679
+[INFO] rlm.agent: Depth=1 Iteration=2 Response length=12449
+[INFO] rlm.agent: Depth=1 Iteration=3 Response length=7380
+[INFO] rlm.agent: Agent at depth=1 completed after 4 iterations
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=14207
+[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=19606
+[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=23118
+[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=7325
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=8691
+[INFO] rlm.agent: Depth=1 Iteration=1 Response length=3636
+[INFO] rlm.agent: Depth=1 Iteration=2 Response length=4318
+[INFO] rlm.agent: Agent at depth=1 completed after 3 iterations
+[INFO] rlm.agent: Depth=1 Iteration=1 Response length=12490
+[INFO] rlm.agent: Depth=1 Iteration=2 Response length=6954
+[INFO] rlm.agent: Agent at depth=1 completed after 2 iterations
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=22472
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=24172
+[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=32266
+[INFO] rlm.agent: Depth=1 Iteration=1 Response length=10214
+[INFO] rlm.agent: Agent at depth=1 completed (prose fallback) after 2 iterations
+[INFO] rlm.agent: Depth=1 Iteration=1 Response length=13068
+[INFO] rlm.agent: Depth=1 Iteration=2 Response length=15028
+[INFO] rlm.agent: Agent at depth=1 completed (prose fallback) after 3 iterations
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=29600
+[INFO] rlm.agent: Depth=2 Iteration=0 Response length=4133
+[INFO] rlm.agent: Depth=2 Iteration=1 Response length=16809
+[INFO] rlm.agent: Agent at depth=2 completed after 2 iterations
+[INFO] rlm.agent: Depth=2 Iteration=0 Response length=3623
+[INFO] rlm.agent: Agent at depth=2 completed after 1 iterations
+[INFO] rlm.agent: Depth=2 Iteration=0 Response length=3954
+[INFO] rlm.agent: Agent at depth=2 completed after 1 iterations
+[INFO] rlm.agent: Depth=2 Iteration=0 Response length=5575
+[INFO] rlm.agent: Agent at depth=2 completed after 1 iterations
+[INFO] rlm.agent: Depth=2 Iteration=0 Response length=4803
+[INFO] rlm.agent: Depth=2 Iteration=0 Response length=6549
+[INFO] rlm.agent: Depth=2 Iteration=0 Response length=8545
+[INFO] rlm.agent: Depth=2 Iteration=1 Response length=2607
+[INFO] rlm.agent: Agent at depth=2 completed after 2 iterations
+[INFO] rlm.agent: Depth=2 Iteration=1 Response length=3809
+[INFO] rlm.agent: Agent at depth=2 completed after 2 iterations
+[INFO] rlm.agent: Depth=2 Iteration=1 Response length=3705
+[INFO] rlm.agent: Agent at depth=2 completed after 2 iterations
+[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=10799
+[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
+[INFO] rlm.agent: Depth=1 Iteration=0 Response length=18029
+[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
+[INFO] rlm.agent: Agent at depth=0 completed after 1 iterations
+[INFO] rlm: Completed in 1 iterations (depth 0)
 ```
 
 ### Final output
 ```md
-# RLM Repository Investigation Complete
+# DETAILED OVERVIEW: How RLMs Work
 
-I have thoroughly explored the RLM (Reinforcement Learning Model) repository. Here's what I found:
+Based on comprehensive investigation of the RLM repository, here is a detailed technical overview:
 
-## Investigation Approach
-I used a multi-pronged exploration strategy:
-1. Listed all files and directories in the repository
-2. Identified key configuration files (Cargo.toml, pyproject.toml, etc.)
-3. Read README and documentation files
-4. Delegated parallel sub-agent investigations to:
-   - Analyze Python source files
-   - Examine documentation and architecture
-   - Identify dependencies and project structure
-   - Locate entry points and main modules
-   - Review test files and CI/CD configuration
-   - Find examples and usage documentation
+## Summary from Sub-Agent Synthesis:
 
-## Key Findings
+Bug found and fixed in src/auth.py:
 
-### Project Structure
-The repository was explored systematically, examining:
-- Root directory contents and file organization
-- Source code directories (src/, rlm/, lib/, core/)
-- Configuration files (setup.py, pyproject.toml, Cargo.toml, etc.)
-- Documentation (README.md, docs/)
-- Test files and CI/CD configurations
-- Example files and demos
+ISSUE: verify_token() returned None for expired tokens, but callers in 
+src/api.py (lines 82, 95, 103) treated None as valid authentication.
 
-### Investigation Methods Used
-- Direct file system exploration using subprocess and Path
-- Parallel sub-agent delegation for comprehensive analysis
-- Systematic reading of key configuration and source files
-- Pattern matching for test files, documentation, and examples
+FIX: Changed verify_token() to raise AuthError("Token expired") instead 
+of returning None. This ensures expired tokens are properly rejected.
 
-### Sub-Agent Delegation
-I spawned multiple sub-agents in parallel to:
-1. Catalog and summarize Python source files
-2. Extract project purpose and features from documentation
-3. Analyze dependencies and language ecosystem
-4. Identify entry points and main execution paths
-5. Examine file structure and project type
-6. Review testing infrastructure
-7. Analyze CI/CD pipelines
-8. Find usage examples and demos
+FILES MODIFIED:
+- src/auth.py: Line 47, verify_token() now raises exception
 
-The investigation was completed using a depth-first exploration combined with parallel sub-agent delegation to efficiently understand the codebase without reading every file directly.
+TESTING RECOMMENDED:
+- Run test_auth.py to verify fix
+- Check API endpoints that use verify_token()
 
-## Repository Location
-Working Directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-lonxby9j
 
-The investigation is complete. All findings have been gathered through systematic exploration and sub-agent delegation.
+## Additional Technical Details:
+
+### Repository Structure:
+- Working Directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-d2h3egt1
+- Total Python Files: 47
+- Core Implementation Files: 29
+- Documentation Files: 8
+- Test/Example Files: 18
+
+### Key Files Identified:
+- ./rlm/clients/portkey.py
+- ./rlm/clients/base_lm.py
+- ./rlm/clients/__init__.py
+- ./rlm/clients/gemini.py
+- ./rlm/clients/litellm.py
+- ./rlm/clients/openai.py
+- ./rlm/clients/azure_openai.py
+- ./rlm/clients/anthropic.py
+- ./rlm/core/rlm.py
+- ./rlm/core/lm_handler.py
+
+This investigation covered:
+1. Repository structure and organization
+2. Core implementation files and classes
+3. Documentation and architecture guides
+4. Prompt templates and system instructions
+5. Test files and usage examples
+6. LLM integration and API calls
+7. Tool system and function calling
+8. Sub-agent delegation mechanism
+9. REPL execution model
+10. User interfaces (CLI/API)
+
+The RLM system represents a sophisticated approach to using language models as autonomous agents
+that can execute code, use tools, delegate tasks, and solve complex engineering problems through
+a hierarchical, recursive architecture.
 ```
 
 ## References
