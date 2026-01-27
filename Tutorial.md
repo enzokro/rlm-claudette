@@ -64,7 +64,7 @@ Three things are happening here:
 
 1. **claudette's `Chat` manages conversation state.** It handles message history, system prompts, and API calls. We call it with a user message, get back an Anthropic `Message` object, and extract the text. We never touch the messages list directly.
 2. **The loop is a REPL pattern.** Prompt the LLM, extract code from its response, execute the code, feed output back as the next prompt. The LLM writes code, sees what happened, writes more code. It keeps going until it calls `FINAL()` or runs out of iterations.
-3. **The agent injects special functions into the REPL namespace.** A `namespace_extras` dict provides `rlm_query`, `rlm_query_batched`, and `edit_file`. The LLM sees functions in scope. It does not know these are closures that spawn subprocesses.
+3. **The agent injects special functions into the REPL namespace.** A `namespace_extras` dict provides `rlm_query`, `rlm_query_batched`, and `edit_file`. The LLM sees functions in scope. It does not know these are closures that spawn sub-agents on threads.
 
 ---
 
@@ -117,12 +117,12 @@ def execute_response(self, text: str) -> REPLResult:
     for block in blocks:
         out = self._execute_block(block)
         outputs.append(out)
-        if self._final_called:
+        if self._final_answer is not None:
             break
 
     return REPLResult(
         output="\n".join(outputs),
-        final_answer=self._final_value if self._final_called else None,
+        final_answer=self._final_answer,
     )
 ```
 
@@ -141,26 +141,42 @@ else:
     exec(compile(tree, "<repl>", "exec"), self._namespace)
 ```
 
-Stdout is redirected to a `StringIO` buffer during execution. Exceptions are caught and their tracebacks written to the same buffer. The LLM sees everything (print output, expression values, error traces) in the next iteration's prompt.
+A custom `print` closure is injected into the namespace. It writes to a per-block `io.StringIO` buffer instead of `sys.stdout`, so multiple REPLs can execute concurrently without interleaving output. Exceptions are caught and their tracebacks written to the same buffer. The LLM sees everything (print output, expression values, error traces) in the next iteration's prompt.
 
-### FINAL
+### FINAL and FINAL_VAR
 
-`FINAL` is a closure injected into the namespace at REPL init time:
+`FINAL` and `FINAL_VAR` are closures injected into the namespace at REPL init time:
 
 ```python
 def _final(answer):
-    self._final_called = True
-    self._final_value = str(answer)
+    self._final_answer = str(answer)
+
+def _final_var(variable_name):
+    self._final_var_name = str(variable_name).strip().strip("\"'")
+
 self._namespace["FINAL"] = _final
+self._namespace["FINAL_VAR"] = _final_var
 ```
 
-When the LLM calls `FINAL("here is my answer")`, the flag flips, execution of further blocks stops, and the answer propagates up through `REPLResult.final_answer`.
+When the LLM calls `FINAL("here is my answer")`, execution of further blocks stops and the answer propagates up through `REPLResult.final_answer`.
+
+`FINAL_VAR` is a deferred variant. The LLM calls `FINAL_VAR("result")` to name a variable, and the REPL resolves it *after* the block finishes executing. This lets the agent build up a complex result in a variable and submit it without stringifying inline:
+
+```python
+# The LLM writes this
+result = "\n".join(f"{f}: {n} lines" for f, n in sorted(counts.items()))
+FINAL_VAR("result")
+```
+
+After `exec()` completes, the REPL looks up `"result"` in its tracked locals and sets `self._final_answer = str(self._locals["result"])`. The agent loop sees a single `repl_result.final_answer` field regardless of which path was used.
+
+The REPL also tracks user-defined variables in `self._locals` after each block execution. This enables `FINAL_VAR` resolution and also supports a prose-level fallback in the agent loop (see below).
 
 ---
 
 ## The namespace
 
-The REPL pre-loads `os`, `subprocess`, and `Path`. The agent adds three more via closures:
+The REPL pre-loads `os`, `subprocess`, `Path`, and `WORKDIR` (a string path to the agent's working directory). The agent adds three more via closures:
 
 ```python
 def _build_namespace(self) -> dict:
@@ -171,17 +187,19 @@ def _build_namespace(self) -> dict:
     return ns
 ```
 
-Together with `FINAL` (injected by the REPL itself), the agent's code has access to everything in this table, plus anything it imports (`import json` works fine since the namespace is a real Python namespace):
+Together with `FINAL` and `FINAL_VAR` (injected by the REPL itself), the agent's code has access to everything in this table, plus anything it imports (`import json` works fine since the namespace is a real Python namespace):
 
 | Name | Source | What it does |
 |------|--------|-------------|
 | `os` | REPL built-in | Standard library `os` module |
 | `subprocess` | REPL built-in | Standard library `subprocess` module |
 | `Path` | REPL built-in | `pathlib.Path` |
+| `WORKDIR` | REPL built-in | String path to the agent's working directory |
 | `rlm_query(task)` | Agent closure | Spawns a sub-agent, returns result string |
 | `rlm_query_batched(tasks)` | Agent closure | Spawns multiple sub-agents in parallel |
 | `edit_file(path, old, new)` | Agent closure | Replaces text in a file |
 | `FINAL(answer)` | REPL closure | Submits the final result, ends the loop |
+| `FINAL_VAR(variable_name)` | REPL closure | Submits a REPL variable's value as the final result |
 
 ### `rlm_query`
 
@@ -196,7 +214,7 @@ def _make_rlm_query(self):
     return rlm_query
 ```
 
-A closure over the agent's sandbox manager and depth. It checks the depth limit, then delegates to `SandboxManager.spawn_agent()`. From the LLM's perspective, it is a function that takes a task description and returns a string. What actually happens is a subprocess gets created in an isolated directory, runs its own full agent loop, and returns its `FINAL()` answer.
+A closure over the agent's sandbox manager and depth. It checks the depth limit, then delegates to `SandboxManager.spawn_agent()`. From the LLM's perspective, it is a function that takes a task description and returns a string. What actually happens is a new `RLMAgent` gets created on a thread in an isolated directory, runs its own full agent loop, and returns its `FINAL()` answer.
 
 ### `rlm_query_batched`
 
@@ -214,7 +232,7 @@ def rlm_query_batched(tasks: list[str]) -> list[str]:
     return results
 ```
 
-Fan-out. Each task gets its own thread, each thread calls `rlm_query`, each `rlm_query` spawns a subprocess. Results come back in the original order. This is where the parallelism comes from: 25 sub-agents exploring different directories simultaneously, each in their own isolated copy of the repo.
+Fan-out. Each task gets its own thread, each thread calls `rlm_query`, each `rlm_query` spawns an in-process agent with its own REPL and Chat. Results come back in the original order. This is where the parallelism comes from: 25 sub-agents exploring different directories simultaneously, each in their own isolated copy of the repo.
 
 ---
 
@@ -241,12 +259,14 @@ class SandboxBudget:
 
 A thread-safe counter. `rlm_query_batched` runs multiple spawns in parallel from different threads, so the lock matters. The budget tracks total sandboxes created over the lifetime of the rollout, not concurrent ones. Once 50 sub-agents have been spawned, no more can be created regardless of how many have finished.
 
-When a child process starts, it gets a `SandboxBudget` initialized with `remaining_budget` from the parent. The child can then spawn its own sub-agents up to that limit.
+All agents run in-process and share a single `SandboxBudget` instance. The `SandboxManager` passes itself (`sandbox_manager=self`) to each child agent, so the budget is enforced globally and exactly. No serialization, no snapshots, no drift.
 
 ### SandboxManager.spawn_agent
 
 ```python
 def spawn_agent(self, task: str, depth: int) -> str:
+    from rlm.agent import RLMAgent  # local import to avoid circular
+
     if not self._budget.acquire():
         return "Error: sandbox budget exhausted"
 
@@ -255,21 +275,18 @@ def spawn_agent(self, task: str, depth: int) -> str:
     try:
         workdir, is_worktree = self._create_workdir()
 
-        payload = json.dumps({
-            "task": task, "workdir": workdir, "depth": depth,
-            "config": self._config.to_dict(),
-            "source_dir": self._source_dir,
-            "remaining_budget": self._budget.remaining,
-        })
-
-        result = subprocess.run(
-            [sys.executable, "-m", "rlm.subprocess_runner"],
-            input=payload, capture_output=True, text=True,
-            timeout=self._config.rlm.global_timeout, cwd=workdir,
+        agent = RLMAgent(
+            config=self._config,
+            task=task,
+            workdir=workdir,
+            depth=depth,
+            sandbox_manager=self,  # same manager, same budget
         )
+        result = agent.run()
+        return result.result or "No result"
 
-        data = json.loads(result.stdout)
-        return data.get("result", "No result")
+    except Exception as e:
+        return f"Error: sub-agent failed: {e}"
     finally:
         if workdir:
             self._cleanup_workdir(workdir, is_worktree)
@@ -278,10 +295,10 @@ def spawn_agent(self, task: str, depth: int) -> str:
 The flow:
 
 1. Acquire budget
-2. Create working directory
-3. Serialize config as JSON
-4. Run `python -m rlm.subprocess_runner` with JSON on stdin
-5. Parse JSON result from stdout
+2. Create working directory (git worktree)
+3. Instantiate a new `RLMAgent` directly, passing `self` as the sandbox manager
+4. Run the agent's iteration loop in-process
+5. Return the result string
 6. Clean up the working directory
 
 ### Git worktrees
@@ -304,47 +321,19 @@ def _create_workdir(self) -> tuple[str, bool]:
         return tmp, False
 ```
 
-`git worktree add` creates a new working tree that shares the same git object store as the original repo. No copying of files in `.git/objects`, so it is fast. Each worktree has its own working directory where the agent can make edits without affecting any other agent's copy. After the subprocess completes, `git worktree remove` cleans it up.
+`git worktree add` creates a new working tree that shares the same git object store as the original repo. No copying of files in `.git/objects`, so it is fast. Each worktree has its own working directory where the agent can make edits without affecting any other agent's copy. After the agent completes, `git worktree remove` cleans it up.
 
 For non-git directories, we fall back to `shutil.copytree`.
 
 ---
 
-## The subprocess boundary
+## In-process recursion
 
-`rlm/subprocess_runner.py` is what runs inside each child process:
+Sub-agents run in the same process as their parent. `spawn_agent()` directly instantiates an `RLMAgent` with `sandbox_manager=self`, so the child shares the same `SandboxManager` and `SandboxBudget`. No serialization, no JSON, no child process. The child gets its own `REPL` and `Chat`, runs its iteration loop, and returns a result string.
 
-```python
-def main() -> None:
-    logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+This is where the recursion happens. The child's `RLMAgent` has the same `SandboxManager`, which can call `spawn_agent` again, which creates another `RLMAgent`, which can spawn more children. Depth is incremented at each level and checked against `max_depth`. The budget is enforced exactly because every agent shares the same counter and lock.
 
-    payload = json.loads(sys.stdin.read())
-
-    config = Config.from_dict(payload["config"])
-    budget = SandboxBudget(payload.get("remaining_budget", 0))
-    sandbox_mgr = SandboxManager(source_dir=payload["source_dir"], budget=budget, config=config)
-
-    agent = RLMAgent(
-        config=config,
-        task=payload["task"],
-        workdir=payload["workdir"],
-        depth=payload["depth"],
-        sandbox_manager=sandbox_mgr,
-    )
-
-    result = agent.run()
-    json.dump({
-        "result": result.result,
-        "iterations": result.iterations,
-        "depth": result.depth,
-    }, sys.stdout)
-```
-
-It reads JSON from stdin, reconstructs all the objects, creates a full `RLMAgent`, runs it, and writes JSON to stdout. All logging goes to stderr so it does not contaminate the JSON result channel.
-
-The child gets its own `SandboxBudget` initialized with the parent's remaining budget. If the parent started with 50 and has used 10, the child gets `SandboxBudget(40)`. The child can then spawn its own sub-agents, passing along *its* remaining budget, and so on down the tree.
-
-This is where the recursion happens. The child's `RLMAgent` has a `SandboxManager` that can call `spawn_agent`, which runs `python -m rlm.subprocess_runner` again, which creates another `RLMAgent`, which can spawn more children. Depth is incremented at each level and checked against `max_depth`.
+Thread-safety matters here. The REPL avoids process-global mutations: no `os.chdir`, no `sys.stdout` reassignment. Each REPL captures output via a namespace-injected `print` that writes to its own `io.StringIO` buffer. Multiple REPLs executing concurrently on different threads produce isolated output.
 
 ---
 
@@ -421,13 +410,13 @@ class Config:
     rlm: RLMConfig = field(default_factory=RLMConfig)
 ```
 
-`Config` has `to_dict()` and `from_dict()` for serialization across the subprocess boundary. `load_config()` reads a YAML file and falls back to defaults if the file does not exist.
+`Config` has `to_dict()` and `from_dict()` for serialization. `load_config()` reads a YAML file and falls back to defaults if the file does not exist.
 
 | Setting | Default | What it controls |
 |---------|---------|-----------------|
 | `max_sandboxes` | 50 | Total sub-agents across the entire tree |
 | `max_iterations` | 50 | Max REPL iterations per agent |
-| `global_timeout` | 3600 | Subprocess timeout in seconds |
+| `global_timeout` | 3600 | Agent timeout in seconds |
 | `result_truncation_limit` | 10000 | Max characters before truncating sub-agent results |
 | `max_depth` | 5 | Maximum recursion depth |
 
@@ -516,22 +505,22 @@ main.py
       +-- loop:
           |   chat(user_prompt) -> response                 # LLM call
           |   repl.execute_response(response_text)          # extract + exec
-          |   if FINAL called: return result
-          |   else: feed output back as next prompt
+          |   if FINAL/FINAL_VAR called: return result
+          |   else: check prose fallback, or feed output back
           |
           |   (LLM writes code calling rlm_query_batched)
           |
           +-- ThreadPoolExecutor -> N threads
                 +-- sandbox_mgr.spawn_agent(task, depth+1)
                       +-- git worktree add -> isolated workdir
-                      +-- subprocess.run("python -m rlm.subprocess_runner")
-                      |     +-- stdin JSON -> Config, Budget, Manager, Agent
+                      +-- RLMAgent(sandbox_manager=self) -> direct call
+                      |     +-- own Chat + own REPL
                       |     +-- agent.run() -> same loop, deeper depth
-                      |     +-- stdout JSON <- result
+                      |     +-- returns result string
                       +-- git worktree remove -> cleanup
 ```
 
-Seven files. No frameworks. The recursion is function calls, subprocesses, and a shared git object store.
+Six files. No frameworks. The recursion is function calls, threads, and a shared git object store.
 
 ---
 
