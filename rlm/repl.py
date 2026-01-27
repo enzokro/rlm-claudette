@@ -5,6 +5,7 @@ import builtins
 import io
 import re
 import traceback
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -106,25 +107,27 @@ class REPL:
         self._buf = buf  # rebind so the injected print writes here
 
         try:
-            tree = ast.parse(code)
-            # If last statement is an expression, wrap it so its value prints
-            if tree.body and isinstance(tree.body[-1], ast.Expr):
-                last_expr = tree.body.pop()
-                # Compile and exec everything except the last expression
-                if tree.body:
-                    exec(  # noqa: S102
-                        compile(ast.Module(body=tree.body, type_ignores=[]), "<repl>", "exec"),
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", SyntaxWarning)
+                tree = ast.parse(code)
+                # If last statement is an expression, wrap it so its value prints
+                if tree.body and isinstance(tree.body[-1], ast.Expr):
+                    last_expr = tree.body.pop()
+                    # Compile and exec everything except the last expression
+                    if tree.body:
+                        exec(  # noqa: S102
+                            compile(ast.Module(body=tree.body, type_ignores=[]), "<repl>", "exec"),
+                            self._namespace,
+                        )
+                    # Evaluate the last expression and print its repr
+                    val = eval(  # noqa: S307
+                        compile(ast.Expression(body=last_expr.value), "<repl>", "eval"),
                         self._namespace,
                     )
-                # Evaluate the last expression and print its repr
-                val = eval(  # noqa: S307
-                    compile(ast.Expression(body=last_expr.value), "<repl>", "eval"),
-                    self._namespace,
-                )
-                if val is not None:
-                    builtins.print(repr(val), file=buf)
-            else:
-                exec(compile(tree, "<repl>", "exec"), self._namespace)  # noqa: S102
+                    if val is not None:
+                        builtins.print(repr(val), file=buf)
+                else:
+                    exec(compile(tree, "<repl>", "exec"), self._namespace)  # noqa: S102
 
         except Exception:
             traceback.print_exc(file=buf)
@@ -142,6 +145,7 @@ class REPL:
             if name in self._locals:
                 self._final_answer = str(self._locals[name])
             else:
-                self._final_answer = f"Error: Variable '{name}' not found"
+                builtins.print(f"Error: FINAL_VAR variable '{name}' not found", file=buf)
+            self._final_var_name = None
 
         return buf.getvalue()

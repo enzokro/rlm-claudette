@@ -37,12 +37,14 @@ def find_final_in_prose(text: str, repl_locals: dict) -> str | None:
     m = _FINAL_IDENT_RE.search(prose)
     if m:
         name = m.group(1)
-        return str(repl_locals.get(name, f"Error: Variable '{name}' not found"))
+        if name in repl_locals:
+            return str(repl_locals[name])
 
     m = _FINAL_VAR_RE.search(prose)
     if m:
         name = m.group(1)
-        return str(repl_locals.get(name, f"Error: Variable '{name}' not found"))
+        if name in repl_locals:
+            return str(repl_locals[name])
 
     return None
 
