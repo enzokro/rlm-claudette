@@ -45,7 +45,7 @@ All agents have the following REPL setup:
 
 Subagents spawned via `rlm_query_batched()` run in parallel threads. Each one calls `spawn_agent()` to instantiate the `RLMAgent` with its own `git worktree`. We chose Worktrees because they share the git object store so creating them is very fast. And as a good practice, we clean up Worktrees after each agent finishes.
 
-## Install
+## Install and Setup
 
 ```bash
 git clone https://github.com/enzokro/rlm-claudette
