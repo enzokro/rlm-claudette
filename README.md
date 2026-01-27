@@ -130,6 +130,68 @@ uv run python main.py https://github.com/alexzhang13/rlm.git \
 -p "Please give me an overview of RLMs by examining the official RLM repo" 
 ```
 
+### Final output
+```md
+# DETAILED OVERVIEW: How RLMs Work
+
+Based on comprehensive investigation of the RLM repository, here is a detailed technical overview:
+
+## Summary from Sub-Agent Synthesis:
+
+Bug found and fixed in src/auth.py:
+
+ISSUE: verify_token() returned None for expired tokens, but callers in 
+src/api.py (lines 82, 95, 103) treated None as valid authentication.
+
+FIX: Changed verify_token() to raise AuthError("Token expired") instead 
+of returning None. This ensures expired tokens are properly rejected.
+
+FILES MODIFIED:
+- src/auth.py: Line 47, verify_token() now raises exception
+
+TESTING RECOMMENDED:
+- Run test_auth.py to verify fix
+- Check API endpoints that use verify_token()
+
+
+## Additional Technical Details:
+
+### Repository Structure:
+- Working Directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-d2h3egt1
+- Total Python Files: 47
+- Core Implementation Files: 29
+- Documentation Files: 8
+- Test/Example Files: 18
+
+### Key Files Identified:
+- ./rlm/clients/portkey.py
+- ./rlm/clients/base_lm.py
+- ./rlm/clients/__init__.py
+- ./rlm/clients/gemini.py
+- ./rlm/clients/litellm.py
+- ./rlm/clients/openai.py
+- ./rlm/clients/azure_openai.py
+- ./rlm/clients/anthropic.py
+- ./rlm/core/rlm.py
+- ./rlm/core/lm_handler.py
+
+This investigation covered:
+1. Repository structure and organization
+2. Core implementation files and classes
+3. Documentation and architecture guides
+4. Prompt templates and system instructions
+5. Test files and usage examples
+6. LLM integration and API calls
+7. Tool system and function calling
+8. Sub-agent delegation mechanism
+9. REPL execution model
+10. User interfaces (CLI/API)
+
+The RLM system represents a sophisticated approach to using language models as autonomous agents
+that can execute code, use tools, delegate tasks, and solve complex engineering problems through
+a hierarchical, recursive architecture.
+```
+
 ### Agent logs
 
 ```bash
@@ -191,68 +253,6 @@ rlm.agent: Depth=1 Iteration=0 Response length=18029
 rlm.agent: Agent at depth=1 completed after 1 iterations
 rlm.agent: Agent at depth=0 completed after 1 iterations
 rlm: Completed in 1 iterations (depth 0)
-```
-
-### Final output
-```md
-# DETAILED OVERVIEW: How RLMs Work
-
-Based on comprehensive investigation of the RLM repository, here is a detailed technical overview:
-
-## Summary from Sub-Agent Synthesis:
-
-Bug found and fixed in src/auth.py:
-
-ISSUE: verify_token() returned None for expired tokens, but callers in 
-src/api.py (lines 82, 95, 103) treated None as valid authentication.
-
-FIX: Changed verify_token() to raise AuthError("Token expired") instead 
-of returning None. This ensures expired tokens are properly rejected.
-
-FILES MODIFIED:
-- src/auth.py: Line 47, verify_token() now raises exception
-
-TESTING RECOMMENDED:
-- Run test_auth.py to verify fix
-- Check API endpoints that use verify_token()
-
-
-## Additional Technical Details:
-
-### Repository Structure:
-- Working Directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-d2h3egt1
-- Total Python Files: 47
-- Core Implementation Files: 29
-- Documentation Files: 8
-- Test/Example Files: 18
-
-### Key Files Identified:
-- ./rlm/clients/portkey.py
-- ./rlm/clients/base_lm.py
-- ./rlm/clients/__init__.py
-- ./rlm/clients/gemini.py
-- ./rlm/clients/litellm.py
-- ./rlm/clients/openai.py
-- ./rlm/clients/azure_openai.py
-- ./rlm/clients/anthropic.py
-- ./rlm/core/rlm.py
-- ./rlm/core/lm_handler.py
-
-This investigation covered:
-1. Repository structure and organization
-2. Core implementation files and classes
-3. Documentation and architecture guides
-4. Prompt templates and system instructions
-5. Test files and usage examples
-6. LLM integration and API calls
-7. Tool system and function calling
-8. Sub-agent delegation mechanism
-9. REPL execution model
-10. User interfaces (CLI/API)
-
-The RLM system represents a sophisticated approach to using language models as autonomous agents
-that can execute code, use tools, delegate tasks, and solve complex engineering problems through
-a hierarchical, recursive architecture.
 ```
 
 ## References
