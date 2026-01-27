@@ -6,7 +6,7 @@ An RLM agent system built on [claudette](https://github.com/AnswerDotAI/claudett
 
 RLM agents write programs instead of calling tools. They interact with their context in a live REPL instead of keeping everything in the same context window. This lets them orchestrate subagents in a powerful recursive pattern that naturally adapts to the task at hand. 
 
-Agents use the `rlm_query` function to spawn subagents as child processes that get their own, isolated sandbox. Subagents can also spawn their own subagents. This gets around a major limitation in tools like Claude Code where, as of writing, subagents cannot spawn their own children. In an RLM the subagent recursion stops at either a given depth, or when the sandbox budget runs out.
+Agents can use their `rlm_query` function to spawn subagents that get their own, isolated sandbox. Subagents can *also* spawn their own subagents. This gets around a major limitation in tools like Claude Code where, as of writing, subagents cannot spawn children. In an RLM the subagent recursion stops after hitting a configured depth, or when the sandbox budget runs out.
 
 ## How rlm-claudette works
 
@@ -42,7 +42,7 @@ Agents are given the following REPL setup:
 
 subagents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which creates a subprocess in its own `git worktree`. Worktrees share the git object store so creating them is very fast. As a good practice, we remove the worktress after the subprocess completes. 
 
-## Setup
+## Install
 
 ```bash
 git clone https://github.com/enzokro/rlm-claudette
@@ -52,21 +52,21 @@ uv sync
 
 Set the `ANTHROPIC_API_KEY` environment variable in your `.env` file.
 
-## Usage
+## Examples
 
 ```bash
-# Run against a local repo
-uv run python main.py /path/to/repo -p "Find all TODO comments and fix the easiest one"
+# Find the breadcrumb TODO in rlm-claudette's own rlm/ repo
+uv run python main.py /path/to/rlm-claudette/rlm -p "Find all TODO comments"
 
-# Run against a git URL
-uv run python main.py https://github.com/org/repo -p "Investigate the test suite" -b main
+# Learn about a repo
+uv run python main.py https://path/to/repo.git -p "Tell me about this repo" 
 
-# Write output to file
-uv run python main.py ./my-project -p "List all API endpoints" -o result.txt
-
-# Verbose logging
+# Verbose logging to see complete workflow
 uv run python main.py ./my-project -p "Refactor the auth module" -v
 ```
+
+At the end of the README, there is a working example of [rlm-claudette analyzing the official RLM repo](## Concrete example looking at a repo)
+
 
 ## Why REPL, not tool-calling 
 
@@ -118,6 +118,96 @@ rlm/
   sandbox.py               # The SandboxBudget and SandboxManager
   prompts.py               # System and user prompts
   subprocess_runner.py     # Entry point for child processes
+```
+
+## Concrete RLM analysis of a repo
+
+```bash
+# Analyze the official RLM repo
+uv run python main.py https://github.com/alexzhang13/rlm.git -p "Investigate the official RLM repo" 
+```
+
+### Agent logs
+
+```bash
+rlm: Source directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-lonxby9j
+rlm: Starting root agent...
+rlm.agent: Depth=0 Iteration=0 Response length=10794
+rlm.agent: Depth=1 Iteration=0 Response length=7058
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=7156
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=9031
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=10180
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=8013
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=8190
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=9740
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=13918
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=27503
+rlm.agent: Agent at depth=1 completed (prose fallback) after 1 iterations
+rlm.agent: Agent at depth=0 completed after 1 iterations
+rlm: Completed in 1 iterations (depth 0)
+```
+
+### Final output
+```md
+# RLM Repository Investigation Complete
+
+I have thoroughly explored the RLM (Reinforcement Learning Model) repository. Here's what I found:
+
+## Investigation Approach
+I used a multi-pronged exploration strategy:
+1. Listed all files and directories in the repository
+2. Identified key configuration files (Cargo.toml, pyproject.toml, etc.)
+3. Read README and documentation files
+4. Delegated parallel sub-agent investigations to:
+   - Analyze Python source files
+   - Examine documentation and architecture
+   - Identify dependencies and project structure
+   - Locate entry points and main modules
+   - Review test files and CI/CD configuration
+   - Find examples and usage documentation
+
+## Key Findings
+
+### Project Structure
+The repository was explored systematically, examining:
+- Root directory contents and file organization
+- Source code directories (src/, rlm/, lib/, core/)
+- Configuration files (setup.py, pyproject.toml, Cargo.toml, etc.)
+- Documentation (README.md, docs/)
+- Test files and CI/CD configurations
+- Example files and demos
+
+### Investigation Methods Used
+- Direct file system exploration using subprocess and Path
+- Parallel sub-agent delegation for comprehensive analysis
+- Systematic reading of key configuration and source files
+- Pattern matching for test files, documentation, and examples
+
+### Sub-Agent Delegation
+I spawned multiple sub-agents in parallel to:
+1. Catalog and summarize Python source files
+2. Extract project purpose and features from documentation
+3. Analyze dependencies and language ecosystem
+4. Identify entry points and main execution paths
+5. Examine file structure and project type
+6. Review testing infrastructure
+7. Analyze CI/CD pipelines
+8. Find usage examples and demos
+
+The investigation was completed using a depth-first exploration combined with parallel sub-agent delegation to efficiently understand the codebase without reading every file directly.
+
+## Repository Location
+Working Directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-lonxby9j
+
+The investigation is complete. All findings have been gathered through systematic exploration and sub-agent delegation.
 ```
 
 ## References
