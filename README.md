@@ -68,7 +68,7 @@ uv run python main.py https://path/to/repo.git -p "Tell me about this repo"
 uv run python main.py ./my-project -p "Refactor the auth module" -v
 ```
 
-At the bottom of this README, there is a working example of [rlm-claudette analyzing the official RLM repo](#concrete-example-looking-at-a-repo)  
+At the bottom of this README, there is a working example of [rlm-claudette analyzing the official RLM repo](#analyzing-the-official-rlm-repo)  
 
 
 ## REPL vs. tool calling
@@ -122,7 +122,7 @@ rlm/
   prompts.py               # System and user prompts
 ```
 
-## Concrete RLM analysis of a repo
+## Analyzing the official RLM repo
 
 ```bash
 # Analyze the official RLM repo
