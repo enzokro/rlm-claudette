@@ -134,6 +134,8 @@ class REPL:
             if key not in self._globals_keys and not key.startswith("_"):
                 self._locals[key] = value
 
+        # TODO: todo breadcrumb for the RLM to find
+
         # Resolve FINAL_VAR after execution
         if self._final_var_name is not None and self._final_answer is None:
             name = self._final_var_name
