@@ -2,15 +2,11 @@
 
 An RLM agent system built on [claudette](https://github.com/AnswerDotAI/claudette). This repo is meant to be a full, working RLM agent and a good learning tool.
 
-RLM agents write programs instead of calling tools. They interact with their prompts and context via a live REPL instead of holding everything in the same, static context window. This also lets them orchestrate sub-agents in a very powerful recursive pattern that naturally adapts to the task at hand. 
+RLM agents write programs instead of calling tools. They interact with their context in a live REPL instead of keeping everything in the same context window. This lets them orchestrate subagents in a powerful recursive pattern that naturally adapts to the task at hand. 
 
-Agents have access to the `rlm_query` function that spawns a sub-agent with its own isolated working directory inside a child process. Sub-agents can then also spawn their own sub-agents. This already gets around a major limitation in tools like Claude Code where, as of writing, sub-agents cannot spawn their own agents. In an RLM the sub-agent recursion stops at either a configurable depth, or when the sandbox budget runs out.
+Agents use the `rlm_query` function to spawn subagents as child processes that get their own, isolated sandbox. Subagents can also spawn their own subagents. This gets around a major limitation in tools like Claude Code where, as of writing, subagents cannot spawn their own children. In an RLM the subagent recursion stops at either a given depth, or when the sandbox budget runs out.
 
-The architecture is described in [Recursive Language Models](https://arxiv.org/abs/2512.24601) (Zhang, Kraska, Khattab) and extended by [Prime Intellect](https://www.primeintellect.ai/blog/rlm). We implemented it here using claudette for LLM calls and local subprocesses with `git worktree` for sandboxes.
-
-## Why REPL, not tool-calling 
-
-RLM agents need to write multi-statement programs with loops, conditional logic, etc. They must also be able to compose multiple `rlm_query` calls. While claudette has an excellent `toolloop` function to handle LLM tool calls, it runs from a fixed set of given Tools. We instead have to let the RLMs define their own "tools" via code on the fly. To that end, we use claudette's `Chat` for easy conversation management but extract and run the code blocks separately.
+The RLM architecture is described in [Recursive Language Models](https://arxiv.org/abs/2512.24601) (Zhang, Kraska, Khattab) and was extended by [Prime Intellect](https://www.primeintellect.ai/blog/rlm). We implement it here using claudette for LLM calls and subprocesses with `git worktree` for the sandboxes.
 
 ## How rlm-claudette works
 
@@ -40,11 +36,11 @@ Agents are given the following REPL setup:
 | Function | What it does |
 |----------|-------------|
 | `rlm_query(task)` | Spawns a sub-agent, returns result string |
-| `rlm_query_batched(tasks)` | Spawns multiple sub-agents in parallel |
+| `rlm_query_batched(tasks)` | Spawns multiple subagents in parallel |
 | `FINAL(answer)` | Submits the final result |
 | `edit_file(path, old, new)` | Edits a file in the working directory |
 
-Sub-agents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which creates a subprocess in its own `git worktree`. Worktrees share the git object store so creating them is very fast. As a good practice, we remove the worktress after the subprocess completes. 
+subagents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which creates a subprocess in its own `git worktree`. Worktrees share the git object store so creating them is very fast. As a good practice, we remove the worktress after the subprocess completes. 
 
 ## Setup
 
@@ -72,6 +68,10 @@ uv run python main.py ./my-project -p "List all API endpoints" -o result.txt
 uv run python main.py ./my-project -p "Refactor the auth module" -v
 ```
 
+## Why REPL, not tool-calling 
+
+RLM agents need to write programs with loops, variables, conditional logic, etc. They must also be able to compose multiple `rlm_query` calls. While claudette has an excellent `toolloop` function that handles LLM tool calls, it only work over a fixed set of known Tools. We instead have to let the RLMs define their own "tools" via code on the fly. To that end, we use claudette's `Chat` to manage the conversation but separately extract and run the code blocks.
+
 ### CLI options
 
 | Flag | Description |
@@ -86,7 +86,7 @@ uv run python main.py ./my-project -p "Refactor the auth module" -v
 
 ## Agent Configuration
 
-Change these settings to control how sub-agents are created and how they recurse. 
+Change these settings to control how subagents are created and how they recurse. 
 
 `config.yaml`:
 
@@ -103,7 +103,7 @@ rlm:
   max_depth: 5
 ```
 
-`max_sandboxes` is the number of total sandboxes across the entire rollout, including the root agent and all of its descendants. `max_depth` caps how deep the recursion goes. Note that sub-agents inherit any remaining budget, not the original amount.
+`max_sandboxes` is the number of total sandboxes across the entire rollout, including the root agent and all of its descendants. `max_depth` caps how deep the recursion goes. Note that subagents inherit any remaining budget, not the original amount.
 
 ## Project structure
 
