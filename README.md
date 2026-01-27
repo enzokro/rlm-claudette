@@ -133,64 +133,64 @@ uv run python main.py https://github.com/alexzhang13/rlm.git \
 ### Agent logs
 
 ```bash
-[INFO] rlm: Source directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-d2h3egt1
-[INFO] rlm: Starting root agent...
-[INFO] rlm.agent: Depth=0 Iteration=0 Response length=13806
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=4891
-[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
-[INFO] rlm.agent: Depth=1 Iteration=1 Response length=11679
-[INFO] rlm.agent: Depth=1 Iteration=2 Response length=12449
-[INFO] rlm.agent: Depth=1 Iteration=3 Response length=7380
-[INFO] rlm.agent: Agent at depth=1 completed after 4 iterations
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=14207
-[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=19606
-[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=23118
-[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=7325
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=8691
-[INFO] rlm.agent: Depth=1 Iteration=1 Response length=3636
-[INFO] rlm.agent: Depth=1 Iteration=2 Response length=4318
-[INFO] rlm.agent: Agent at depth=1 completed after 3 iterations
-[INFO] rlm.agent: Depth=1 Iteration=1 Response length=12490
-[INFO] rlm.agent: Depth=1 Iteration=2 Response length=6954
-[INFO] rlm.agent: Agent at depth=1 completed after 2 iterations
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=22472
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=24172
-[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=32266
-[INFO] rlm.agent: Depth=1 Iteration=1 Response length=10214
-[INFO] rlm.agent: Agent at depth=1 completed (prose fallback) after 2 iterations
-[INFO] rlm.agent: Depth=1 Iteration=1 Response length=13068
-[INFO] rlm.agent: Depth=1 Iteration=2 Response length=15028
-[INFO] rlm.agent: Agent at depth=1 completed (prose fallback) after 3 iterations
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=29600
-[INFO] rlm.agent: Depth=2 Iteration=0 Response length=4133
-[INFO] rlm.agent: Depth=2 Iteration=1 Response length=16809
-[INFO] rlm.agent: Agent at depth=2 completed after 2 iterations
-[INFO] rlm.agent: Depth=2 Iteration=0 Response length=3623
-[INFO] rlm.agent: Agent at depth=2 completed after 1 iterations
-[INFO] rlm.agent: Depth=2 Iteration=0 Response length=3954
-[INFO] rlm.agent: Agent at depth=2 completed after 1 iterations
-[INFO] rlm.agent: Depth=2 Iteration=0 Response length=5575
-[INFO] rlm.agent: Agent at depth=2 completed after 1 iterations
-[INFO] rlm.agent: Depth=2 Iteration=0 Response length=4803
-[INFO] rlm.agent: Depth=2 Iteration=0 Response length=6549
-[INFO] rlm.agent: Depth=2 Iteration=0 Response length=8545
-[INFO] rlm.agent: Depth=2 Iteration=1 Response length=2607
-[INFO] rlm.agent: Agent at depth=2 completed after 2 iterations
-[INFO] rlm.agent: Depth=2 Iteration=1 Response length=3809
-[INFO] rlm.agent: Agent at depth=2 completed after 2 iterations
-[INFO] rlm.agent: Depth=2 Iteration=1 Response length=3705
-[INFO] rlm.agent: Agent at depth=2 completed after 2 iterations
-[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=10799
-[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
-[INFO] rlm.agent: Depth=1 Iteration=0 Response length=18029
-[INFO] rlm.agent: Agent at depth=1 completed after 1 iterations
-[INFO] rlm.agent: Agent at depth=0 completed after 1 iterations
-[INFO] rlm: Completed in 1 iterations (depth 0)
+rlm: Source directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-d2h3egt1
+rlm: Starting root agent...
+rlm.agent: Depth=0 Iteration=0 Response length=13806
+rlm.agent: Depth=1 Iteration=0 Response length=4891
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=1 Response length=11679
+rlm.agent: Depth=1 Iteration=2 Response length=12449
+rlm.agent: Depth=1 Iteration=3 Response length=7380
+rlm.agent: Agent at depth=1 completed after 4 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=14207
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=19606
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=23118
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=7325
+rlm.agent: Depth=1 Iteration=0 Response length=8691
+rlm.agent: Depth=1 Iteration=1 Response length=3636
+rlm.agent: Depth=1 Iteration=2 Response length=4318
+rlm.agent: Agent at depth=1 completed after 3 iterations
+rlm.agent: Depth=1 Iteration=1 Response length=12490
+rlm.agent: Depth=1 Iteration=2 Response length=6954
+rlm.agent: Agent at depth=1 completed after 2 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=22472
+rlm.agent: Depth=1 Iteration=0 Response length=24172
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=32266
+rlm.agent: Depth=1 Iteration=1 Response length=10214
+rlm.agent: Agent at depth=1 completed (prose fallback) after 2 iterations
+rlm.agent: Depth=1 Iteration=1 Response length=13068
+rlm.agent: Depth=1 Iteration=2 Response length=15028
+rlm.agent: Agent at depth=1 completed (prose fallback) after 3 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=29600
+rlm.agent: Depth=2 Iteration=0 Response length=4133
+rlm.agent: Depth=2 Iteration=1 Response length=16809
+rlm.agent: Agent at depth=2 completed after 2 iterations
+rlm.agent: Depth=2 Iteration=0 Response length=3623
+rlm.agent: Agent at depth=2 completed after 1 iterations
+rlm.agent: Depth=2 Iteration=0 Response length=3954
+rlm.agent: Agent at depth=2 completed after 1 iterations
+rlm.agent: Depth=2 Iteration=0 Response length=5575
+rlm.agent: Agent at depth=2 completed after 1 iterations
+rlm.agent: Depth=2 Iteration=0 Response length=4803
+rlm.agent: Depth=2 Iteration=0 Response length=6549
+rlm.agent: Depth=2 Iteration=0 Response length=8545
+rlm.agent: Depth=2 Iteration=1 Response length=2607
+rlm.agent: Agent at depth=2 completed after 2 iterations
+rlm.agent: Depth=2 Iteration=1 Response length=3809
+rlm.agent: Agent at depth=2 completed after 2 iterations
+rlm.agent: Depth=2 Iteration=1 Response length=3705
+rlm.agent: Agent at depth=2 completed after 2 iterations
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=10799
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Depth=1 Iteration=0 Response length=18029
+rlm.agent: Agent at depth=1 completed after 1 iterations
+rlm.agent: Agent at depth=0 completed after 1 iterations
+rlm: Completed in 1 iterations (depth 0)
 ```
 
 ### Final output
