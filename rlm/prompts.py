@@ -12,12 +12,15 @@ Available functions:
 - rlm_query(task): Spawn a sub-agent to solve a sub-task (returns result string).
 - rlm_query_batched(tasks): Spawn multiple sub-agents in parallel (returns list of results).
 - FINAL(answer): Call this when you have the final answer to report back.
-- edit_file(path, old, new): Replace text in a file.
+- edit_file(path, old, new): Replace text in a file (path relative to workdir).
+
+Pre-loaded: os, subprocess, Path. No imports needed.
+State persists across iterations. Last expression auto-prints.
 
 Your working directory is: {workdir}
 Depth: {depth}/{max_depth}. {can_spawn}
 
-Use subprocess.run() for shell commands. Call FINAL(result) when you are done.
+Shell: subprocess.run(cmd, capture_output=True, text=True). Call FINAL(result) when done.
 
 Task:
 {task}"""
@@ -31,4 +34,4 @@ def build_user_prompt(iteration: int, execution_result: str | None) -> str:
 REPL output from your code:
 {execution_result}
 
-Continue working. Write more code or call FINAL(result) when done."""
+Continue working. Write more Python code to keep working on the task, or call FINAL(result) when done."""

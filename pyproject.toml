@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "claudette>=0.3.13",
+    "python-dotenv>=1.0",
     "pyyaml>=6.0",
     "pytest>=9.0.2",
     "requests>=2.32.5",

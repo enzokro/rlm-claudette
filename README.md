@@ -1,16 +1,18 @@
 # rlm-claudette
 
-A recursive language model agent system built on [claudette](https://github.com/AnswerDotAI/claudette).
+An RLM agent system built on [claudette](https://github.com/AnswerDotAI/claudette). This repo is meant to be a full, working RLM agent and a good learning tool.
 
-Agents don't call tools. They write programs. Each iteration of the loop, Claude produces Python code in fenced blocks. We extract it, execute it in a persistent namespace, and feed the output back. The namespace includes `rlm_query`---a function that spawns a sub-agent as a child process with its own isolated working directory. Sub-agents can spawn their own sub-agents. The recursion bottoms out at a configurable depth, or when the sandbox budget runs dry.
+RLM agents write programs instead of calling tools. They interact with their prompts and context via a live REPL instead of holding everything in the same, static context window. This also lets them orchestrate sub-agents in a very powerful recursive pattern that naturally adapts to the task at hand. 
 
-This is the architecture described in [Recursive Language Models](https://arxiv.org/abs/2512.24601) (Zhang, Kraska, Khattab) and extended by [Prime Intellect](https://www.primeintellect.ai/blog/rlm), adapted here to use claudette for LLM calls and local subprocesses with `git worktree` for isolation.
+Agents have access to the `rlm_query` function that spawns a sub-agent with its own isolated working directory inside a child process. Sub-agents can then also spawn their own sub-agents. This already gets around a major limitation in tools like Claude Code where, as of writing, sub-agents cannot spawn their own agents. In an RLM the sub-agent recursion stops at either a configurable depth, or when the sandbox budget runs out.
 
-## Why REPL, not tool-calling
+The architecture is described in [Recursive Language Models](https://arxiv.org/abs/2512.24601) (Zhang, Kraska, Khattab) and extended by [Prime Intellect](https://www.primeintellect.ai/blog/rlm). We implemented it here using claudette for LLM calls and local subprocesses with `git worktree` for sandboxes.
 
-The RLM architecture requires agents to write multi-statement programs---loops, variable assignment, composing multiple `rlm_query` calls, conditional logic. claudette's `toolloop` handles single function invocations per turn. That's the wrong granularity. We use `Chat` for conversation management but extract and exec code blocks ourselves.
+## Why REPL, not tool-calling 
 
-## How it works
+RLM agents need to write multi-statement programs with loops, conditional logic, etc. They must also be able to compose multiple `rlm_query` calls. While claudette has an excellent `toolloop` function to handle LLM tool calls, it runs from a fixed set of given Tools. We instead have to let the RLMs define their own "tools" via code on the fly. To that end, we use claudette's `Chat` for easy conversation management but extract and run the code blocks separately.
+
+## How rlm-claudette works
 
 ```
 Root Agent (main process)
@@ -25,34 +27,34 @@ Root Agent (main process)
         +-- SandboxBudget (thread-safe counter)
 ```
 
-Each iteration:
+Each iteration does the following:
 
-1. Build a prompt with context from the previous execution
-2. Get an LLM completion from Claude
-3. Extract and execute Python code blocks in a persistent namespace
-4. Check if the agent called `FINAL()` to submit results
-5. Format the output for the next iteration
+1. Builds a prompt with context from the previous execution
+2. Sends the prompt to a Claude LLM and stores its response
+3. Extracts and executes the Python code blocks from the response
+4. Checks if the agent called `FINAL()` to signal that the task is finished
+5. Formats the output for the next iteration
 
-Inside the REPL, agents have access to:
+Agents are given the following REPL setup:
 
 | Function | What it does |
 |----------|-------------|
-| `rlm_query(task)` | Spawn a sub-agent, returns result string |
-| `rlm_query_batched(tasks)` | Spawn multiple sub-agents in parallel |
-| `FINAL(answer)` | Submit final result |
-| `edit_file(path, old, new)` | Edit a file in the working directory |
+| `rlm_query(task)` | Spawns a sub-agent, returns result string |
+| `rlm_query_batched(tasks)` | Spawns multiple sub-agents in parallel |
+| `FINAL(answer)` | Submits the final result |
+| `edit_file(path, old, new)` | Edits a file in the working directory |
 
-Sub-agents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which creates a subprocess in its own `git worktree`. Worktrees share the git object store, so creation is fast. They're removed after the subprocess completes. For non-git source directories, we fall back to `shutil.copytree`.
+Sub-agents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which creates a subprocess in its own `git worktree`. Worktrees share the git object store so creating them is very fast. As a good practice, we remove the worktress after the subprocess completes. 
 
 ## Setup
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/enzokro/rlm-claudette
 cd rlm-claudette
 uv sync
 ```
 
-Requires an `ANTHROPIC_API_KEY` environment variable.
+Set the `ANTHROPIC_API_KEY` environment variable in your `.env` file.
 
 ## Usage
 
@@ -82,7 +84,9 @@ uv run python main.py ./my-project -p "Refactor the auth module" -v
 | `--commit` | Specific commit SHA |
 | `-v, --verbose` | Debug logging |
 
-## Configuration
+## Agent Configuration
+
+Change these settings to control how sub-agents are created and how they recurse. 
 
 `config.yaml`:
 
@@ -99,19 +103,19 @@ rlm:
   max_depth: 5
 ```
 
-`max_sandboxes` is the total budget across the entire rollout---root agent plus all descendants. `max_depth` caps how deep the recursion goes. Sub-agents inherit the remaining budget, not the original.
+`max_sandboxes` is the number of total sandboxes across the entire rollout, including the root agent and all of its descendants. `max_depth` caps how deep the recursion goes. Note that sub-agents inherit any remaining budget, not the original amount.
 
 ## Project structure
 
 ```
-main.py                    # CLI entry point
-config.yaml                # Default configuration
+main.py                    # CLI entry 
+config.yaml                # The default config
 rlm/
   __init__.py
-  config.py                # Config dataclasses + YAML loading
-  agent.py                 # RLMAgent: the LLM-REPL iteration loop
-  repl.py                  # Code extraction + exec in persistent namespace
-  sandbox.py               # SandboxBudget + SandboxManager
-  prompts.py               # System/user prompt templates
-  subprocess_runner.py     # Child process entry point
+  config.py                # Config dataclasses and YAML loading
+  agent.py                 # The main LLM-REPL loop via RLMAgent
+  repl.py                  # Extracts and runs code in a persistent namespace
+  sandbox.py               # The SandboxBudget and SandboxManager
+  prompts.py               # System and user prompts
+  subprocess_runner.py     # Entry point for child processes
 ```

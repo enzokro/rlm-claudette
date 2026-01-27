@@ -3,6 +3,7 @@
 Invoked as: python -m rlm.subprocess_runner
 Reads JSON from stdin, runs an agent, writes JSON result to stdout.
 All logging goes to stderr.
+Environment is inherited from the parent process (main.py loads dotenv).
 """
 
 import json
@@ -64,6 +65,7 @@ def main() -> None:
             "depth": depth,
         }, sys.stdout)
 
+# TODO: buried breadcrumb for the RML to find
 
 if __name__ == "__main__":
     main()
