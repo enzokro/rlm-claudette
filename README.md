@@ -1,12 +1,12 @@
 # rlm-claudette
 
-An RLM agent system built on [claudette](https://github.com/AnswerDotAI/claudette). This repo is meant to be a full, working RLM agent and a good learning tool.
+An RLM agent system built on [claudette](https://github.com/AnswerDotAI/claudette). This repo is meant to be a full RLM agent and a good learning tool. It implements the unlimitted recursion depth [explored by the Daytona team](https://www.daytona.io/docs/en/recursive-language-models/). 
+
+## Introduction 
 
 RLM agents write programs instead of calling tools. They interact with their context in a live REPL instead of keeping everything in the same context window. This lets them orchestrate subagents in a powerful recursive pattern that naturally adapts to the task at hand. 
 
 Agents use the `rlm_query` function to spawn subagents as child processes that get their own, isolated sandbox. Subagents can also spawn their own subagents. This gets around a major limitation in tools like Claude Code where, as of writing, subagents cannot spawn their own children. In an RLM the subagent recursion stops at either a given depth, or when the sandbox budget runs out.
-
-The RLM architecture is described in [Recursive Language Models](https://arxiv.org/abs/2512.24601) (Zhang, Kraska, Khattab) and was extended by [Prime Intellect](https://www.primeintellect.ai/blog/rlm). We implement it here using claudette for LLM calls and subprocesses with `git worktree` for the sandboxes.
 
 ## How rlm-claudette works
 
@@ -119,3 +119,8 @@ rlm/
   prompts.py               # System and user prompts
   subprocess_runner.py     # Entry point for child processes
 ```
+
+## References
+- [Recursive Language Models](https://arxiv.org/abs/2512.24601) (Zhang, Kraska, Khattab) 
+- [Prime Intellect RLM Extension](https://www.primeintellect.ai/blog/rlm)
+- [Daytona Unlimitted Recursion RLM post](https://www.daytona.io/docs/en/recursive-language-models/)

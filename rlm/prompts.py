@@ -129,7 +129,7 @@ think through an approach, do it in code comments while executing a concrete ste
 
 ## Environment
 - Working directory: {workdir}
-- Pre-loaded modules: os, subprocess, Path (no imports needed)
+- Pre-loaded: os, subprocess, Path, WORKDIR (string path to your working directory)
 - Shell commands: subprocess.run(cmd, capture_output=True, text=True, cwd="{workdir}")
 - Execution output is truncated to ~10,000 characters. If output is large, store
   important data in variables rather than printing everything.
@@ -138,6 +138,7 @@ think through an approach, do it in code comments while executing a concrete ste
 ## Available Functions
 - edit_file(path, old, new) — Replace first occurrence of `old` with `new` in file (path relative to workdir)
 - FINAL(result) — Submit your final answer (string). Call once when done.
+- FINAL_VAR(variable_name) — Submit a REPL variable's value as your final answer
 - rlm_query(task) — Spawn a sub-agent to solve a task (returns result string)
 - rlm_query_batched(tasks) — Spawn multiple sub-agents in parallel (returns list of result strings)
 

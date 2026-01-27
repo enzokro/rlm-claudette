@@ -1,10 +1,8 @@
-"""Subprocess-based isolation for sub-agents using git worktrees."""
+"""In-process isolation for sub-agents using git worktrees."""
 
-import json
 import logging
 import shutil
 import subprocess
-import sys
 import tempfile
 import threading
 from pathlib import Path
@@ -41,7 +39,7 @@ class SandboxBudget:
 
 
 class SandboxManager:
-    """Manages spawning sub-agent subprocesses in isolated git worktrees."""
+    """Manages spawning sub-agents in isolated git worktrees via in-process threads."""
 
     def __init__(self, source_dir: str, budget: SandboxBudget, config: Config):
         self._source_dir = source_dir
@@ -54,6 +52,8 @@ class SandboxManager:
 
     def spawn_agent(self, task: str, depth: int) -> str:
         """Spawn a sub-agent in an isolated worktree. Returns result string."""
+        from rlm.agent import RLMAgent  # local import to avoid circular
+
         if not self._budget.acquire():
             return "Error: sandbox budget exhausted"
 
@@ -62,38 +62,18 @@ class SandboxManager:
         try:
             workdir, is_worktree = self._create_workdir()
 
-            payload = json.dumps({
-                "task": task,
-                "workdir": workdir,
-                "depth": depth,
-                "config": self._config.to_dict(),
-                "source_dir": self._source_dir,
-                "remaining_budget": self._budget.remaining,
-            })
-
-            result = subprocess.run(
-                [sys.executable, "-m", "rlm.subprocess_runner"],
-                input=payload,
-                capture_output=True,
-                text=True,
-                timeout=self._config.rlm.global_timeout,
-                cwd=workdir,
+            agent = RLMAgent(
+                config=self._config,
+                task=task,
+                workdir=workdir,
+                depth=depth,
+                sandbox_manager=self,
             )
+            result = agent.run()
+            return result.result or "No result"
 
-            if result.returncode != 0:
-                logger.error("Sub-agent stderr: %s", result.stderr)
-                return f"Error: sub-agent failed (exit {result.returncode}): {result.stderr[:500]}"
-
-            try:
-                data = json.loads(result.stdout)
-                return data.get("result", "No result")
-            except json.JSONDecodeError:
-                return f"Error: invalid JSON from sub-agent: {result.stdout[:500]}"
-
-        except subprocess.TimeoutExpired:
-            return "Error: sub-agent timed out"
         except Exception as e:
-            return f"Error spawning sub-agent: {e}"
+            return f"Error: sub-agent failed: {e}"
         finally:
             if workdir:
                 self._cleanup_workdir(workdir, is_worktree)

@@ -1,6 +1,7 @@
 """RLM Agent: the LLM-REPL iteration loop."""
 
 import logging
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -14,6 +15,39 @@ from rlm.sandbox import SandboxManager
 
 logger = logging.getLogger(__name__)
 
+# -- Prose-level FINAL / FINAL_VAR detection regexes --------------------------
+
+_CODE_BLOCK_RE = re.compile(r"```python\s*\n.*?```", re.DOTALL)
+_FINAL_LITERAL_RE = re.compile(r'FINAL\s*\(\s*["\'](.+?)["\']\s*\)', re.DOTALL)
+_FINAL_IDENT_RE = re.compile(r'FINAL\s*\(\s*([a-zA-Z_]\w*)\s*\)')
+_FINAL_VAR_RE = re.compile(r'FINAL_VAR\s*\(\s*["\'](.+?)["\']\s*\)')
+
+
+def find_final_in_prose(text: str, repl_locals: dict) -> str | None:
+    """Detect FINAL(...) or FINAL_VAR(...) in prose (outside code blocks).
+
+    Returns resolved answer string or None.
+    """
+    prose = _CODE_BLOCK_RE.sub("", text)
+
+    m = _FINAL_LITERAL_RE.search(prose)
+    if m:
+        return m.group(1)
+
+    m = _FINAL_IDENT_RE.search(prose)
+    if m:
+        name = m.group(1)
+        return str(repl_locals.get(name, f"Error: Variable '{name}' not found"))
+
+    m = _FINAL_VAR_RE.search(prose)
+    if m:
+        name = m.group(1)
+        return str(repl_locals.get(name, f"Error: Variable '{name}' not found"))
+
+    return None
+
+
+# -----------------------------------------------------------------------------
 
 @dataclass
 class AgentResult:
@@ -77,10 +111,21 @@ class RLMAgent:
             repl_result = repl.execute_response(response_text)
             iterations = iteration + 1
 
+            # Primary: code-level FINAL / FINAL_VAR (handled inside REPL)
             if repl_result.final_answer is not None:
                 logger.info("Agent at depth=%d completed after %d iterations", self._depth, iterations)
                 return AgentResult(
                     result=repl_result.final_answer,
+                    iterations=iterations,
+                    depth=self._depth,
+                )
+
+            # Fallback: prose-level FINAL / FINAL_VAR
+            prose_answer = find_final_in_prose(response_text, repl.locals)
+            if prose_answer is not None:
+                logger.info("Agent at depth=%d completed (prose fallback) after %d iterations", self._depth, iterations)
+                return AgentResult(
+                    result=prose_answer,
                     iterations=iterations,
                     depth=self._depth,
                 )
