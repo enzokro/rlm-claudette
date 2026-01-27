@@ -1,0 +1,12 @@
+[project]
+name = "rlm-claudette"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "claudette>=0.3.13",
+    "pyyaml>=6.0",
+    "pytest>=9.0.2",
+    "requests>=2.32.5",
+]
