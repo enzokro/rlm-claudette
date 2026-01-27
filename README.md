@@ -70,7 +70,7 @@ uv run python main.py ./my-project -p "Refactor the auth module" -v
 
 ## Why REPL, not tool-calling 
 
-RLM agents need to write programs with loops, variables, conditional logic, etc. They must also be able to compose multiple `rlm_query` calls. While claudette has an excellent `toolloop` function that handles LLM tool calls, it only work over a fixed set of known Tools. We instead have to let the RLMs define their own "tools" via code on the fly. To that end, we use claudette's `Chat` to manage the conversation but separately extract and run the code blocks.
+RLM agents need to write programs with loops, variables, conditional logic, etc. They must also be able to compose multiple `rlm_query` calls. While claudette has an excellent `toolloop` function that handles LLM tool calls, it only works over a fixed set of known Tools. We instead have to let the RLMs define their own "tools" via code on the fly. To that end, we use claudette's `Chat` to manage the conversation but separately extract and run the code blocks.
 
 ### CLI options
 
