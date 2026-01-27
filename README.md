@@ -8,7 +8,7 @@ This repo aims to be both a full, working RLM system and a good learning tool.
 
 RLM agents write programs instead of calling tools. They interact with their context in a live REPL instead of keeping everything in the same context window. This lets them orchestrate subagents in a powerful recursive pattern that naturally adapts to the task at hand. 
 
-Agents can use their `rlm_query` function to spawn subagents that get their own, isolated sandbox. Subagents can *also* spawn their own subagents. This gets around a major limitation in tools like Claude Code where, as of writing, subagents cannot spawn children. In an RLM the subagent recursions stop when they hit a configurable depth, or when the sandbox budget runs out.
+Agents can use the `rlm_query` function to spawn subagents inside their own, isolated sandbox. Subagents can *also* spawn their own subagents. This gets around a major limitation in tools like Claude Code where, as of writing, subagents cannot spawn children. In an RLM, the subagent recursions stop when they hit a configurable depth or when the sandbox budget runs out.  
 
 ## How rlm-claudette works
 
@@ -32,7 +32,7 @@ Each iteration follows the same process:
 4. Check if the agent called `FINAL()` to signal that the task is done
 5. Format the output for the next iteration
 
-Agents are given the following REPL setup:
+All agents have the following REPL setup:
 
 | Function | What it does |
 |----------|-------------|
@@ -43,7 +43,7 @@ Agents are given the following REPL setup:
 | `edit_file(path, old, new)` | Edits a file in the working directory |
 | `WORKDIR` | String path to the agent's working directory |
 
-Subagents spawned via `rlm_query_batched()` run in parallel threads, each calling `spawn_agent()` which instantiates the `RLMAgent` in its own `git worktree`. Worktrees share the git object store so creating them is very fast. As a good practice, we clean up Worktrees after each agent finishes.
+Subagents spawned via `rlm_query_batched()` run in parallel threads. Each one calls `spawn_agent()` to instantiate the `RLMAgent` with its own `git worktree`. We chose Worktrees because they share the git object store so creating them is very fast. And as a good practice, we clean up Worktrees after each agent finishes.
 
 ## Install
 
@@ -126,7 +126,8 @@ rlm/
 
 ```bash
 # Analyze the official RLM repo
-uv run python main.py https://github.com/alexzhang13/rlm.git -p "Investigate the official RLM repo" 
+uv run python main.py https://github.com/alexzhang13/rlm.git \
+-p "Please give me a detailed overview of how RLMs work by investigating the official RLM repo" 
 ```
 
 ### Agent logs

@@ -38,12 +38,14 @@ The `run()` method in `rlm/agent.py` is the entire agent:
 ```python
 def run(self) -> AgentResult:
     sp = build_system_prompt(depth=self._depth, max_depth=..., workdir=..., task=...)
-    chat = Chat(model=self._config.model.name, sp=sp, temp=0)
+    chat = Chat(model=self._config.model.name, sp=sp, temp=self._config.model.temperature)
 
     namespace_extras = self._build_namespace()
     repl = REPL(namespace_extras=namespace_extras, workdir=self._workdir)
 
     execution_result = None
+    iterations = 0
+
     for iteration in range(self._config.rlm.max_iterations):
         if self._is_timeout():
             break
@@ -53,17 +55,29 @@ def run(self) -> AgentResult:
         response_text = self._extract_text(response)
 
         repl_result = repl.execute_response(response_text)
+        iterations = iteration + 1
 
+        # Primary: code-level FINAL / FINAL_VAR (handled inside REPL)
         if repl_result.final_answer is not None:
-            return AgentResult(result=repl_result.final_answer, ...)
+            return AgentResult(result=repl_result.final_answer, iterations=iterations, depth=self._depth)
 
+        # Fallback: prose-level FINAL / FINAL_VAR
+        prose_answer = find_final_in_prose(response_text, repl.locals)
+        if prose_answer is not None:
+            return AgentResult(result=prose_answer, iterations=iterations, depth=self._depth)
+
+        # Truncate output for next prompt
         execution_result = repl_result.output
+        if len(execution_result) > self._config.rlm.result_truncation_limit:
+            execution_result = execution_result[:self._config.rlm.result_truncation_limit] + "\n... (truncated)"
+
+    return AgentResult(result=None, iterations=iterations, depth=self._depth)
 ```
 
 Three things are happening here:
 
 1. **claudette's `Chat` manages conversation state.** It handles message history, system prompts, and API calls. We call it with a user message, get back an Anthropic `Message` object, and extract the text. We never touch the messages list directly.
-2. **The loop is a REPL pattern.** Prompt the LLM, extract code from its response, execute the code, feed output back as the next prompt. The LLM writes code, sees what happened, writes more code. It keeps going until it calls `FINAL()` or runs out of iterations.
+2. **The loop has a two-stage completion check.** After executing the code blocks, the agent first checks whether `FINAL` or `FINAL_VAR` was called inside the code (the REPL sets `final_answer`). If not, it falls back to `find_final_in_prose`, which scans the response text outside code blocks for `FINAL(...)` patterns. If neither check finds a result, the execution output is truncated to the configured limit and fed back as the next user prompt.
 3. **The agent injects special functions into the REPL namespace.** A `namespace_extras` dict provides `rlm_query`, `rlm_query_batched`, and `edit_file`. The LLM sees functions in scope. It does not know these are closures that spawn sub-agents on threads.
 
 ---
@@ -170,7 +184,36 @@ FINAL_VAR("result")
 
 After `exec()` completes, the REPL looks up `"result"` in its tracked locals and sets `self._final_answer = str(self._locals["result"])`. The agent loop sees a single `repl_result.final_answer` field regardless of which path was used.
 
-The REPL also tracks user-defined variables in `self._locals` after each block execution. This enables `FINAL_VAR` resolution and also supports a prose-level fallback in the agent loop (see below).
+The REPL also tracks user-defined variables in `self._locals` after each block execution. This enables `FINAL_VAR` resolution and also supports a prose-level fallback in the agent loop (next section).
+
+### Prose fallback: `find_final_in_prose`
+
+Sometimes the LLM writes `FINAL(...)` in prose text rather than inside a code block. The agent loop handles this with a fallback in `rlm/agent.py`. After the REPL runs all code blocks and finds no `final_answer`, the agent calls `find_final_in_prose(response_text, repl.locals)`:
+
+```python
+def find_final_in_prose(text: str, repl_locals: dict) -> str | None:
+    prose = _CODE_BLOCK_RE.sub("", text)  # strip code blocks
+
+    m = _FINAL_LITERAL_RE.search(prose)   # FINAL("some literal")
+    if m:
+        return m.group(1)
+
+    m = _FINAL_IDENT_RE.search(prose)     # FINAL(some_variable)
+    if m:
+        name = m.group(1)
+        if name in repl_locals:
+            return str(repl_locals[name])
+
+    m = _FINAL_VAR_RE.search(prose)       # FINAL_VAR("varname")
+    if m:
+        name = m.group(1)
+        if name in repl_locals:
+            return str(repl_locals[name])
+
+    return None
+```
+
+The function strips all fenced code blocks from the response, then searches the remaining prose for three patterns: `FINAL("literal")` returns the literal string directly, `FINAL(identifier)` looks up the identifier in the REPL's tracked locals, and `FINAL_VAR("varname")` does the same variable lookup. If an identifier or variable name is not found in `repl_locals`, the function returns `None` — the agent loop continues rather than treating a missing variable as a final answer. This avoids false completions when the LLM mentions `FINAL(result_string)` in a sentence as a description of intent rather than an actual call.
 
 ---
 
@@ -195,6 +238,7 @@ Together with `FINAL` and `FINAL_VAR` (injected by the REPL itself), the agent's
 | `subprocess` | REPL built-in | Standard library `subprocess` module |
 | `Path` | REPL built-in | `pathlib.Path` |
 | `WORKDIR` | REPL built-in | String path to the agent's working directory |
+| `print` | REPL closure | Writes to a per-block `io.StringIO` buffer, not `sys.stdout` |
 | `rlm_query(task)` | Agent closure | Spawns a sub-agent, returns result string |
 | `rlm_query_batched(tasks)` | Agent closure | Spawns multiple sub-agents in parallel |
 | `edit_file(path, old, new)` | Agent closure | Replaces text in a file |
@@ -343,45 +387,67 @@ Thread-safety matters here. The REPL avoids process-global mutations: no `os.chd
 
 ### build_system_prompt
 
-Tells the LLM what it is and what it can do:
+Assembles a structured system prompt from several sections. The final string is not a flat template; `build_system_prompt` composes role text, instructions, and depth-dependent guidance:
+
+- **Role** — differs for root vs sub-agent. Root: "You are the root RLM agent. You orchestrate sub-agents and synthesize their results." Sub-agent: "You are a sub-agent spawned to accomplish a specific task. You have a fresh copy of the repository with no edits from your parent."
+- **REPL Instructions** — every response must contain at least one fenced Python code block. No prose-only responses. Variables persist across iterations.
+- **Environment** — pre-loaded modules (`os`, `subprocess`, `Path`, `WORKDIR`), current depth, and truncation limit (~10,000 characters).
+- **Available Functions** — `edit_file`, `FINAL`, `FINAL_VAR`, `rlm_query`, `rlm_query_batched`.
+- **Sub-agent guidance** — via `_subagent_guidance(depth, max_depth, workdir)`, which has four depth-dependent variants.
+- **Workflow** — 6-step for root (explore, investigate, plan, execute, verify, submit), 4-step for sub-agents (explore, investigate, execute, report).
+- **Final guidance** — via `_final_guidance(is_root)`. Sub-agents get a visibility warning: the parent only sees what is passed to `FINAL()`. All `print()` output is invisible to the parent.
+
+The sub-agent guidance function branches on depth:
 
 ```python
-return f"""\
-You are an RLM agent. You write Python code in ```python blocks to accomplish tasks.
+def _subagent_guidance(depth: int, max_depth: int, workdir: str) -> str:
+    if depth >= max_depth:
+        return "You are at maximum depth and CANNOT spawn sub-agents."
 
-Available functions:
-- rlm_query(task): Spawn a sub-agent to solve a sub-task (returns result string).
-- rlm_query_batched(tasks): Spawn multiple sub-agents in parallel (returns list of results).
-- FINAL(answer): Call this when you have the final answer to report back.
-- edit_file(path, old, new): Replace text in a file.
+    if depth == 0:
+        # Root agent: full delegation guidance with examples, self-contained
+        # task rules, and a parallel delegation code sample.
+        return "## Sub-Agent Delegation (HIGHLY RECOMMENDED) ..."
 
-Your working directory is: {workdir}
-Depth: {depth}/{max_depth}. {can_spawn}
+    if depth < max_depth - 1:
+        # Mid-depth: brief encouragement to use rlm_query/rlm_query_batched.
+        return "## Sub-Agents ..."
 
-Use subprocess.run() for shell commands. Call FINAL(result) when you are done.
-
-Task:
-{task}"""
+    # depth == max_depth - 1: can spawn, but children will be at max depth.
+    return "## Sub-Agents\nYou can spawn sub-agents, but they will be at maximum depth ..."
 ```
 
-The `can_spawn` line changes based on depth. At maximum depth, it says "You are at maximum depth and CANNOT spawn sub-agents." This prevents the LLM from trying to call `rlm_query` when it would just get an error back.
+This means a depth-0 root agent gets detailed delegation instructions with examples, a mid-tree agent gets a short reminder, an agent one level from the max gets a warning that its children cannot recurse further, and an agent at max depth is told it cannot spawn at all.
 
 ### build_user_prompt
 
-Handles the iteration-to-iteration communication:
+Handles the iteration-to-iteration communication. Three cases:
+
+- **Iteration 0:** `"Start by exploring the codebase. List files, read key files, and understand the workspace before making changes or calling FINAL()."` No execution output yet.
+- **Iterations 1-2:** Shows the execution output, then `"Continue working. Investigate further or begin implementing."` Early iterations encourage exploration before committing to a solution.
+- **Iteration 3+:** Shows the execution output, then `"Continue. If your work is complete, verify it and call FINAL(result)."` Later iterations nudge toward completion.
+
+If the execution output contains `"... (truncated)"` (appended by the agent loop when output exceeds the truncation limit), the prompt appends advice: store important data in variables instead of printing everything, or delegate to sub-agents for large investigations.
 
 ```python
 def build_user_prompt(iteration: int, execution_result: str | None) -> str:
     if iteration == 0:
-        return "Begin working on your task. Write Python code in ```python blocks."
-    return f"""\
-REPL output from your code:
-{execution_result}
+        return "Start by exploring the codebase..."
 
-Continue working. Write more code or call FINAL(result) when done."""
+    truncation_note = ""
+    if execution_result and "... (truncated)" in execution_result:
+        truncation_note = (
+            "\nNote: Output was truncated. Store important data in variables "
+            "instead of printing everything, or use sub-agents for large investigations."
+        )
+
+    if iteration <= 2:
+        return f"Execution output:\n{execution_result}\n{truncation_note}\nContinue working. Investigate further or begin implementing."
+
+    return f"Execution output:\n{execution_result}\n{truncation_note}\nContinue. If your work is complete, verify it and call FINAL(result)."
 ```
 
-Iteration 0 says "go." Every subsequent iteration shows the LLM what its code produced and tells it to continue. The LLM sees its own stdout, tracebacks, and return values, and can react: fix errors, refine its approach, run more code based on what it learned.
+The LLM sees its own stdout, tracebacks, and return values, and can react: fix errors, refine its approach, run more code based on what it learned.
 
 ---
 
@@ -457,7 +523,7 @@ A concrete example:
 uv run python main.py ./my-project -p "Count the lines of code in each Python file"
 ```
 
-**Iteration 0** (depth 0): The LLM receives "Begin working on your task." It writes:
+**Iteration 0** (depth 0): The LLM receives "Start by exploring the codebase..." It writes:
 
 ```python
 import os
@@ -500,13 +566,14 @@ main.py
   -> SandboxManager(source_dir, budget, config)
   -> RLMAgent(config, task, workdir, depth=0, sandbox_manager)
   -> agent.run()
-      +-- Chat(model, sp=system_prompt, temp=0)           # claudette
+      +-- Chat(model, sp=system_prompt, temp=config.temp)   # claudette
       +-- REPL(namespace_extras={rlm_query, ...}, workdir) # persistent namespace
       +-- loop:
           |   chat(user_prompt) -> response                 # LLM call
           |   repl.execute_response(response_text)          # extract + exec
-          |   if FINAL/FINAL_VAR called: return result
-          |   else: check prose fallback, or feed output back
+          |   if FINAL/FINAL_VAR called: return result      # code-level check
+          |   if FINAL in prose: return result               # prose fallback
+          |   truncate output, feed back as next prompt      # continue loop
           |
           |   (LLM writes code calling rlm_query_batched)
           |
