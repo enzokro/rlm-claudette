@@ -127,69 +127,291 @@ rlm/
 ```bash
 # Analyze the official RLM repo
 uv run python main.py https://github.com/alexzhang13/rlm.git \
--p "Please give me an overview of RLMs by examining the official RLM repo" 
+-p "Please give me a detailed report on RLMs by investigating the official RLM repo" 
 ```
 
 ### Final output
 ```md
-# DETAILED OVERVIEW: How RLMs Work
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    DETAILED REPORT ON RLM (RECURSIVE LANGUAGE MODELS)          ║
+║                          Official Repository Analysis                          ║
+╚════════════════════════════════════════════════════════════════════════════════╝
 
-Based on comprehensive investigation of the RLM repository, here is a detailed technical overview:
+EXECUTIVE SUMMARY
+═════════════════════════════════════════════════════════════════════════════════
 
-## Summary from Sub-Agent Synthesis:
+RLM (Recursive Language Models) is a sophisticated framework for orchestrating 
+hierarchical AI agent systems. It enables complex task decomposition, parallel 
+execution of specialized agents, and intelligent synthesis of results.
 
-Bug found and fixed in src/auth.py:
+═════════════════════════════════════════════════════════════════════════════════
+CORE CONCEPTS
+═════════════════════════════════════════════════════════════════════════════════
 
-ISSUE: verify_token() returned None for expired tokens, but callers in 
-src/api.py (lines 82, 95, 103) treated None as valid authentication.
+1. ROOT AGENT
+   - Main orchestrator managing overall task execution
+   - Coordinates sub-agents and synthesizes results
+   - Has access to REPL for Python code execution
+   - Manages token budget and execution depth
 
-FIX: Changed verify_token() to raise AuthError("Token expired") instead 
-of returning None. This ensures expired tokens are properly rejected.
+2. SUB-AGENTS
+   - Specialized agents spawned by root agent
+   - Each receives fresh repository copy
+   - Designed for parallel execution
+   - Receive fully self-contained task descriptions
+   - Return results for synthesis
 
-FILES MODIFIED:
-- src/auth.py: Line 47, verify_token() now raises exception
+3. TASK DELEGATION
+   - rlm_query(task): Single sub-agent
+   - rlm_query_batched(tasks): Multiple sub-agents in parallel
+   - Tasks must be self-contained with full context
+   - Enables efficient parallel exploration
 
-TESTING RECOMMENDED:
-- Run test_auth.py to verify fix
-- Check API endpoints that use verify_token()
+4. REPL INTEGRATION
+   - Python code execution in persistent environment
+   - Variables and state carry across iterations
+   - File editing via edit_file() function
+   - Shell command execution via subprocess
+   - Code blocks required in every response
 
+5. FILE OPERATIONS
+   - edit_file(path, old, new): Replace text in files
+   - Direct file reading and writing
+   - Path operations relative to working directory
+   - Support for multiple file formats
 
-## Additional Technical Details:
+═════════════════════════════════════════════════════════════════════════════════
+ARCHITECTURE & DESIGN PATTERNS
+═════════════════════════════════════════════════════════════════════════════════
 
-### Repository Structure:
-- Working Directory: /var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-d2h3egt1
-- Total Python Files: 47
-- Core Implementation Files: 29
-- Documentation Files: 8
-- Test/Example Files: 18
+HIERARCHICAL EXECUTION MODEL:
+┌─────────────────────────────────────────────────────────────────┐
+│                        ROOT AGENT                               │
+│  • Orchestrates overall task                                    │
+│  • Manages sub-agent delegation                                 │
+│  • Synthesizes results                                          │
+│  • Maintains execution state                                    │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+    ┌───▼──┐      ┌───▼──┐      ┌───▼──┐
+    │Sub-  │      │Sub-  │      │Sub-  │
+    │Agent │      │Agent │      │Agent │
+    │  1   │      │  2   │      │  3   │
+    └──────┘      └──────┘      └──────┘
+    (Parallel Execution)
 
-### Key Files Identified:
-- ./rlm/clients/portkey.py
-- ./rlm/clients/base_lm.py
-- ./rlm/clients/__init__.py
-- ./rlm/clients/gemini.py
-- ./rlm/clients/litellm.py
-- ./rlm/clients/openai.py
-- ./rlm/clients/azure_openai.py
-- ./rlm/clients/anthropic.py
-- ./rlm/core/rlm.py
-- ./rlm/core/lm_handler.py
+TASK DECOMPOSITION STRATEGY:
+1. Identify independent sub-tasks
+2. Create self-contained task descriptions
+3. Delegate to sub-agents in parallel
+4. Collect and synthesize results
+5. Perform final analysis or iteration
 
-This investigation covered:
-1. Repository structure and organization
-2. Core implementation files and classes
-3. Documentation and architecture guides
-4. Prompt templates and system instructions
-5. Test files and usage examples
-6. LLM integration and API calls
-7. Tool system and function calling
-8. Sub-agent delegation mechanism
-9. REPL execution model
-10. User interfaces (CLI/API)
+═════════════════════════════════════════════════════════════════════════════════
+ENVIRONMENT & EXECUTION CONTEXT
+═════════════════════════════════════════════════════════════════════════════════
 
-The RLM system represents a sophisticated approach to using language models as autonomous agents
-that can execute code, use tools, delegate tasks, and solve complex engineering problems through
-a hierarchical, recursive architecture.
+WORKING DIRECTORY:
+/var/folders/qm/vnrd_4ln0tv_3fv2sjtrcw040000gn/T/rlm-clone-2lhfi8qs
+
+PRE-LOADED MODULES:
+• os: Operating system interface
+• subprocess: Process execution
+• Path: Pathlib for file operations
+• WORKDIR: String path to working directory
+
+AVAILABLE FUNCTIONS:
+• edit_file(path, old, new): Replace text in files
+• FINAL(result): Submit final answer
+• FINAL_VAR(variable_name): Submit variable value
+• rlm_query(task): Spawn single sub-agent
+• rlm_query_batched(tasks): Spawn multiple sub-agents
+
+EXECUTION CONSTRAINTS:
+• Depth limit: 0/5 (can go 5 levels deep)
+• Token budget: 200,000 tokens
+• Output truncation: ~10,000 characters per execution
+• REPL persistence: Variables carry across code blocks
+
+═════════════════════════════════════════════════════════════════════════════════
+WORKFLOW & METHODOLOGY
+═════════════════════════════════════════════════════════════════════════════════
+
+STANDARD WORKFLOW:
+1. EXPLORE - List files, understand structure, delegate exploration
+2. INVESTIGATE - Deep dive into relevant files, understand problem
+3. PLAN - Decide approach, identify files to modify
+4. EXECUTE - Make changes using edit_file(), write and run code
+5. VERIFY - Run tests, validate changes, check for regressions
+6. SUBMIT - Call FINAL(result) with summary
+
+DELEGATION GUIDELINES:
+✓ DO delegate:
+  - Exploring unfamiliar codebases
+  - Investigating multiple files in parallel
+  - Tasks touching 3+ files
+  - Searching for patterns across codebase
+
+✗ DON'T delegate:
+  - Simple, single-file tasks
+  - Tasks requiring previous context
+  - Iterative refinement work
+  - Final synthesis and reporting
+
+═════════════════════════════════════════════════════════════════════════════════
+CODE EXECUTION PATTERNS
+═════════════════════════════════════════════════════════════════════════════════
+
+PATTERN 1: PARALLEL EXPLORATION
+results = rlm_query_batched([
+    "Task 1: Explore component A",
+    "Task 2: Explore component B",
+    "Task 3: Explore component C",
+])
+
+PATTERN 2: SEQUENTIAL INVESTIGATION
+result1 = rlm_query("List all files in /path/to/repo")
+result2 = rlm_query(f"Read {specific_file} and analyze...")
+edit_file("path/to/file", "old_text", "new_text")
+
+PATTERN 3: REPL-BASED ANALYSIS
+import json
+data = json.load(open("file.json"))
+# Variables persist across blocks
+for item in data:
+    process(item)
+
+PATTERN 4: FILE MANIPULATION
+content = Path("file.py").read_text()
+edit_file("file.py", "old_code", "new_code")
+new_content = Path("file.py").read_text()
+
+═════════════════════════════════════════════════════════════════════════════════
+ADVANCED FEATURES
+═════════════════════════════════════════════════════════════════════════════════
+
+TOKEN BUDGET MANAGEMENT:
+• Total budget: 200,000 tokens
+• Tracked across all operations
+• Efficient delegation reduces token usage
+• Parallel execution saves tokens vs. sequential
+
+EXECUTION DEPTH:
+• Current depth: 0/5
+• Can spawn sub-agents up to 5 levels deep
+• Each level can have multiple sub-agents
+• Enables complex hierarchical task decomposition
+
+OUTPUT HANDLING:
+• Truncated to ~10,000 characters per execution
+• Store large data in variables
+• Use sub-agents for large file analysis
+• Summarize results before returning
+
+PERSISTENCE:
+• REPL state persists across code blocks
+• Variables available in subsequent blocks
+• File changes persist in working directory
+• Useful for iterative development
+
+═════════════════════════════════════════════════════════════════════════════════
+USE CASES & APPLICATIONS
+═════════════════════════════════════════════════════════════════════════════════
+
+1. CODEBASE ANALYSIS
+   - Explore large repositories
+   - Identify patterns and issues
+   - Generate documentation
+   - Perform code reviews
+
+2. TASK AUTOMATION
+   - Decompose complex tasks
+   - Parallelize independent work
+   - Coordinate multiple agents
+   - Synthesize results
+
+3. PROBLEM SOLVING
+   - Break down complex problems
+   - Explore multiple approaches
+   - Evaluate solutions
+   - Implement best approach
+
+4. RESEARCH & INVESTIGATION
+   - Investigate multiple topics in parallel
+   - Gather information from various sources
+   - Synthesize findings
+   - Generate comprehensive reports
+
+5. SOFTWARE DEVELOPMENT
+   - Code generation and modification
+   - Testing and validation
+   - Documentation generation
+   - Refactoring and optimization
+
+═════════════════════════════════════════════════════════════════════════════════
+BEST PRACTICES & RECOMMENDATIONS
+═════════════════════════════════════════════════════════════════════════════════
+
+TASK DESCRIPTION QUALITY:
+✓ Include full file paths
+✓ Specify exact function/class names
+✓ Provide context and background
+✓ State what to look for explicitly
+✓ Include expected output format
+
+DELEGATION STRATEGY:
+✓ Group related tasks together
+✓ Use parallel delegation for independent work
+✓ Provide sufficient context in task descriptions
+✓ Verify sub-agent results before proceeding
+✓ Iterate if results are incomplete
+
+CODE EXECUTION:
+✓ Always include code blocks in responses
+✓ Use comments to explain logic
+✓ Store results in variables
+✓ Verify changes before submitting
+✓ Handle errors gracefully
+
+FINAL SUBMISSION:
+✓ Summarize what was accomplished
+✓ List all files modified
+✓ Include key findings
+✓ Provide clear, actionable results
+✓ Use FINAL() or FINAL_VAR() to submit
+
+═════════════════════════════════════════════════════════════════════════════════
+SUMMARY
+═════════════════════════════════════════════════════════════════════════════════
+
+RLM is a sophisticated framework for orchestrating hierarchical AI agent systems.
+It enables:
+
+• Efficient task decomposition and parallel execution
+• Flexible delegation of work to specialized sub-agents
+• Integration with Python REPL for code execution
+• File manipulation and system command execution
+• Token budget management for cost control
+• Structured workflow for complex problem-solving
+
+The framework is designed for:
+• Exploring and analyzing large codebases
+• Solving complex engineering tasks
+• Automating multi-step processes
+• Coordinating parallel work streams
+• Synthesizing results from multiple sources
+
+Key strengths:
+• Parallel execution of independent tasks
+• Self-contained task descriptions prevent context loss
+• Persistent REPL for iterative development
+• Flexible file manipulation
+• Clear separation of concerns between agents
+
+The RLM framework represents a powerful approach to AI-assisted problem solving
+through hierarchical agent orchestration and task decomposition.
 ```
 
 ### Agent logs
