@@ -4,6 +4,8 @@
 
 A [Recursive Language Model](https://arxiv.org/abs/2512.24601) (RLM) is an LLM agent that spawns copies of itself. The root agent decomposes a problem, spawns children to work different pieces in parallel, and those children spawn *their own* children. Results flow back up the tree. The recursion adapts to the task because the agent decides at runtime how deep and wide to go.
 
+Most agent frameworks, including Claude Code as of writing, don't let subagents spawn their own children. RLMs do. The recursion stops when it hits a configurable depth or when the sandbox budget runs out.
+
 This is a complete RLM implementation built on [claudette](https://github.com/AnswerDotAI/claudette). We start at the CLI and work down.
 
 ---
@@ -14,7 +16,7 @@ This is a complete RLM implementation built on [claudette](https://github.com/An
 uv run python main.py ./my-repo -p "Find all TODO comments and fix the easiest one" -v
 ```
 
-The root agent gets the prompt, writes Python code to explore the repo, optionally spawns sub-agents for parallel work, and calls `FINAL()` when done.
+The root agent gets the prompt, writes Python code to explore the repo, optionally spawns subagents for parallel work, and calls `FINAL()` when done.
 
 The call chain:
 
@@ -72,9 +74,11 @@ def run(self) -> AgentResult:
     return AgentResult(result=None, iterations=iterations, depth=self._depth)
 ```
 
-1. **claudette's `Chat` manages conversation state.** We call it with a user message, get back an Anthropic `Message` object, and extract the text. We never touch the messages list directly.
-2. **The loop has a two-stage completion check.** After executing the code blocks, the agent checks whether `FINAL` or `FINAL_VAR` was called inside the code (the REPL sets `final_answer`). If not, it falls back to `find_final_in_prose`, which scans the response text outside code blocks for `FINAL(...)` patterns. If neither finds a result, the output is truncated and fed back as the next prompt.
-3. **The agent injects closures into the REPL namespace.** `rlm_query`, `rlm_query_batched`, and `edit_file`. The LLM sees functions in scope. It does not know they spawn sub-agents on threads.
+claudette's `Chat` manages conversation state. We call it with a user message, get back an Anthropic `Message` object, and extract the text. We never touch the messages list directly.
+
+The loop has a two-stage completion check. After executing the code blocks, the agent checks whether `FINAL` or `FINAL_VAR` was called inside the code (the REPL sets `final_answer`). If not, it falls back to `find_final_in_prose`, which scans the response text outside code blocks for `FINAL(...)` patterns. If neither finds a result, the output is truncated and fed back as the next prompt.
+
+The agent also injects closures into the REPL namespace: `rlm_query`, `rlm_query_batched`, and `edit_file`. The LLM sees functions in scope. It does not know they spawn subagents on threads.
 
 ---
 
@@ -91,7 +95,7 @@ for root, dirs, filenames in os.walk("."):
         if f.endswith(".py"):
             files.append(os.path.join(root, f))
 
-# Spawn sub-agents for each directory
+# Spawn subagents for each directory
 dirs_with_todos = set(os.path.dirname(f) for f in files)
 tasks = [f"Search for TODO comments in {d}/" for d in sorted(dirs_with_todos)[:10]]
 results = rlm_query_batched(tasks)
@@ -136,7 +140,7 @@ def execute_response(self, text: str) -> REPLResult:
     )
 ```
 
-`_execute_block` uses `ast.parse` to solve a specific problem: if the last statement in a code block is a bare expression (like `len(files)` on its own line), we want to capture its value. The code pops the last AST node if it is an `Expr`, `exec`s everything else, then `eval`s just that final expression:
+`_execute_block` parses each block with `ast.parse`. If the last statement is a bare expression (like `len(files)` on its own line), we want to capture its value — so the code pops the last AST node if it is an `Expr`, `exec`s everything else, then `eval`s just that final expression:
 
 ```python
 tree = ast.parse(code)
@@ -178,7 +182,7 @@ result = "\n".join(f"{f}: {n} lines" for f, n in sorted(counts.items()))
 FINAL_VAR("result")
 ```
 
-After `exec()` completes, the REPL looks up `"result"` in its tracked locals and sets `self._final_answer = str(self._locals["result"])`. The agent loop sees a single `repl_result.final_answer` field regardless of which path was used.
+After `exec()` completes, the REPL looks up `"result"` in its tracked locals and sets `self._final_answer = str(self._locals["result"])`. Either way, the agent loop sees one `repl_result.final_answer` field.
 
 The REPL tracks user-defined variables in `self._locals` after each block. Both `FINAL_VAR` resolution and the prose-level fallback (next section) depend on this.
 
@@ -209,7 +213,7 @@ def find_final_in_prose(text: str, repl_locals: dict) -> str | None:
     return None
 ```
 
-The function strips fenced code blocks, then searches the remaining prose for three patterns: `FINAL("literal")` returns the string directly, `FINAL(identifier)` looks up the identifier in the REPL's tracked locals, and `FINAL_VAR("varname")` does the same lookup. If a variable name is not found in `repl_locals`, the function returns `None` — the agent loop continues. This avoids false completions when the LLM mentions `FINAL(result_string)` as a description of intent rather than an actual call.
+The function strips fenced code blocks, then searches the remaining prose for three patterns: `FINAL("literal")` returns the string directly, `FINAL(identifier)` looks up the identifier in the REPL's tracked locals, and `FINAL_VAR("varname")` does the same lookup. If a variable name is not found in `repl_locals`, the function returns `None` — the agent loop continues. This avoids false completions when the LLM is just talking about calling `FINAL`, not actually calling it.
 
 ---
 
@@ -235,8 +239,8 @@ With `FINAL` and `FINAL_VAR` from the REPL, plus standard imports (`import json`
 | `Path` | REPL built-in | `pathlib.Path` |
 | `WORKDIR` | REPL built-in | String path to the agent's working directory |
 | `print` | REPL closure | Writes to a per-block `io.StringIO` buffer, not `sys.stdout` |
-| `rlm_query(task)` | Agent closure | Spawns a sub-agent, returns result string |
-| `rlm_query_batched(tasks)` | Agent closure | Spawns multiple sub-agents in parallel |
+| `rlm_query(task)` | Agent closure | Spawns a subagent, returns result string |
+| `rlm_query_batched(tasks)` | Agent closure | Spawns multiple subagents in parallel |
 | `edit_file(path, old, new)` | Agent closure | Replaces text in a file |
 | `FINAL(answer)` | REPL closure | Submits the final result, ends the loop |
 | `FINAL_VAR(variable_name)` | REPL closure | Submits a REPL variable's value as the final result |
@@ -272,7 +276,7 @@ def rlm_query_batched(tasks: list[str]) -> list[str]:
     return results
 ```
 
-Fan-out. Each task gets its own thread, each thread calls `rlm_query`, each `rlm_query` spawns an in-process agent with its own REPL and Chat. Results come back in the original order. This is the parallelism: 25 sub-agents exploring different directories simultaneously, each in an isolated copy of the repo.
+Fan-out. Each task gets its own thread, each thread calls `rlm_query`, each `rlm_query` spawns an in-process agent with its own REPL and Chat. Results come back in the original order. This is the parallelism: 25 subagents exploring different directories simultaneously, each in an isolated copy of the repo.
 
 ---
 
@@ -297,7 +301,7 @@ class SandboxBudget:
             return True
 ```
 
-Thread-safe counter. `rlm_query_batched` runs multiple spawns in parallel from different threads, so the lock matters. The budget tracks total sandboxes created over the lifetime of the rollout, not concurrent ones. Once 50 sub-agents have been spawned, no more get created regardless of how many have finished.
+Thread-safe counter. `rlm_query_batched` runs multiple spawns in parallel from different threads, so the lock matters. The budget tracks total sandboxes created over the lifetime of the rollout, not concurrent ones. Once 50 subagents have been spawned, no more get created regardless of how many have finished.
 
 All agents run in-process and share a single `SandboxBudget` instance. The `SandboxManager` passes itself (`sandbox_manager=self`) to each child agent, so the budget is enforced globally and exactly. No serialization, no snapshots, no drift.
 
@@ -361,7 +365,7 @@ def _create_workdir(self) -> tuple[str, bool]:
         return tmp, False
 ```
 
-Each worktree gives the agent its own working directory. Edits in one worktree do not affect any other agent's copy. After the agent completes, `git worktree remove` cleans it up.
+Each worktree gives the agent its own working directory. Edits in one worktree do not affect any other agent's copy. And we clean up with `git worktree remove` after each agent finishes.
 
 For non-git directories, we fall back to `shutil.copytree`.
 
@@ -369,7 +373,7 @@ For non-git directories, we fall back to `shutil.copytree`.
 
 ## In-process recursion
 
-Sub-agents run in the same process as their parent. `spawn_agent()` instantiates an `RLMAgent` with `sandbox_manager=self`, so the child shares the same `SandboxManager` and `SandboxBudget`. No serialization, no JSON, no child process. The child gets its own `REPL` and `Chat`, runs its iteration loop, and returns a result string.
+Subagents run in the same process as their parent. `spawn_agent()` instantiates an `RLMAgent` with `sandbox_manager=self`, so the child shares the same `SandboxManager` and `SandboxBudget`. No serialization, no JSON, no child process. The child gets its own `REPL` and `Chat`, runs its iteration loop, and returns a result string.
 
 The child's `RLMAgent` has the same `SandboxManager`, which can call `spawn_agent` again, which creates another `RLMAgent`, which can spawn more children. Depth is incremented at each level and checked against `max_depth`. The budget is enforced exactly because every agent shares the same counter and lock.
 
@@ -383,17 +387,9 @@ The REPL avoids process-global mutations: no `os.chdir`, no `sys.stdout` reassig
 
 ### build_system_prompt
 
-Not a flat template. `build_system_prompt` composes role text, instructions, and depth-dependent guidance:
+Not a flat template. `build_system_prompt` composes a role description (root agents orchestrate, subagents execute a specific task), REPL rules (every response must have code blocks, variables persist), environment info, and the available functions list. Root agents get a 6-step workflow (explore, investigate, plan, execute, verify, submit); subagents get 4 steps. Subagents also get a visibility warning: the parent only sees what goes into `FINAL()`. All `print()` output is invisible to the parent.
 
-- **Role** — differs for root vs sub-agent. Root: "You are the root RLM agent." Sub-agent: "You are a sub-agent spawned to accomplish a specific task."
-- **REPL Instructions** — every response must contain at least one fenced Python code block. No prose-only responses. Variables persist across iterations.
-- **Environment** — pre-loaded modules (`os`, `subprocess`, `Path`, `WORKDIR`), current depth, and truncation limit (~10,000 characters).
-- **Available Functions** — `edit_file`, `FINAL`, `FINAL_VAR`, `rlm_query`, `rlm_query_batched`.
-- **Sub-agent guidance** — via `_subagent_guidance(depth, max_depth, workdir)`, four depth-dependent variants.
-- **Workflow** — 6-step for root (explore, investigate, plan, execute, verify, submit), 4-step for sub-agents (explore, investigate, execute, report).
-- **Final guidance** — via `_final_guidance(is_root)`. Sub-agents get a visibility warning: the parent only sees what goes into `FINAL()`. All `print()` output is invisible to the parent.
-
-The sub-agent guidance function branches on depth:
+`_subagent_guidance` branches on depth:
 
 ```python
 def _subagent_guidance(depth: int, max_depth: int, workdir: str) -> str:
@@ -413,7 +409,7 @@ def _subagent_guidance(depth: int, max_depth: int, workdir: str) -> str:
     return "## Sub-Agents\nYou can spawn sub-agents, but they will be at maximum depth ..."
 ```
 
-Prompt detail decreases with depth. The root agent gets full delegation instructions with examples. An agent at max depth cannot spawn at all. We designed it this way so deeper agents carry less prompt weight — they have narrower tasks and do not need the full delegation playbook.
+The root agent gets full delegation instructions with examples. An agent at max depth cannot spawn at all. We taper the detail because deeper agents have narrower tasks — they don't need the full set of delegation rules.
 
 ### build_user_prompt
 
@@ -423,7 +419,7 @@ Prompt detail decreases with depth. The root agent gets full delegation instruct
 - **Iterations 1-2:** Shows execution output, then `"Continue working. Investigate further or begin implementing."` Early iterations encourage exploration.
 - **Iteration 3+:** Shows execution output, then `"Continue. If your work is complete, verify it and call FINAL(result)."` Later iterations nudge toward completion.
 
-When output gets truncated, the prompt adds advice: store data in variables, or delegate to sub-agents.
+When output gets truncated, the prompt adds advice: store data in variables, or delegate to subagents.
 
 ```python
 def build_user_prompt(iteration: int, execution_result: str | None) -> str:
@@ -443,7 +439,7 @@ def build_user_prompt(iteration: int, execution_result: str | None) -> str:
     return f"Execution output:\n{execution_result}\n{truncation_note}\nContinue. If your work is complete, verify it and call FINAL(result)."
 ```
 
-The LLM sees its own stdout, tracebacks, and return values. Errors get corrected, partial results get refined — the loop is self-correcting.
+The LLM sees its own stdout, tracebacks, and return values, and iterates from there.
 
 ---
 
@@ -476,10 +472,10 @@ class Config:
 
 | Setting | Default | What it controls |
 |---------|---------|-----------------|
-| `max_sandboxes` | 50 | Total sub-agents across the entire tree |
+| `max_sandboxes` | 50 | Total subagents across the entire tree |
 | `max_iterations` | 50 | Max REPL iterations per agent |
 | `global_timeout` | 3600 | Agent timeout in seconds |
-| `result_truncation_limit` | 10000 | Max characters before truncating sub-agent results |
+| `result_truncation_limit` | 10000 | Max characters before truncating subagent results |
 | `max_depth` | 5 | Maximum recursion depth |
 
 ---
@@ -507,7 +503,7 @@ agent = RLMAgent(config=config, task=args.prompt, workdir=source_dir, depth=0, s
 result = agent.run()
 ```
 
-Depth 0. The root agent. Everything else (the tree of sub-agents, the parallel exploration, the recursive delegation) emerges from the LLM's decisions inside the loop.
+Depth 0. The root agent. Everything else (the tree of subagents, the parallel exploration, the recursive delegation) emerges from the LLM's decisions inside the loop.
 
 ---
 
@@ -545,9 +541,9 @@ FINAL(summary)
 
 The REPL executes this, `FINAL` gets called, the loop ends. `agent.run()` returns an `AgentResult` with the summary string. `main.py` prints it.
 
-Two iterations. No sub-agents needed. The LLM decided it could handle this alone.
+Two iterations. No subagents needed. The LLM decided it could handle this alone.
 
-For a harder task ("find all TODOs and fix the easiest one"), the LLM might spend iteration 0 exploring the file tree, iteration 1 spawning 10 sub-agents via `rlm_query_batched` to search different directories in parallel, iteration 2 reviewing the results and picking the easiest TODO, and iteration 3 calling `edit_file` and `FINAL`. Each of those 10 sub-agents runs its own iteration loop at depth 1, potentially spawning depth-2 agents for particularly large directories.
+For a harder task ("find all TODOs and fix the easiest one"), the LLM might spend iteration 0 exploring the file tree, iteration 1 spawning 10 subagents via `rlm_query_batched` to search different directories in parallel, iteration 2 reviewing the results and picking the easiest TODO, and iteration 3 calling `edit_file` and `FINAL`. Each of those 10 subagents runs its own iteration loop at depth 1, potentially spawning depth-2 agents for particularly large directories.
 
 ---
 
@@ -587,8 +583,8 @@ Six files. No frameworks. The recursion is function calls, threads, and a shared
 
 ## Where this goes
 
-Current language models are not trained for recursive delegation. RLMs do not yet outperform single-agent approaches on benchmarks. The architecture still has properties that matter.
+Current language models are not trained for recursive delegation. RLMs do not yet outperform single-agent approaches on benchmarks. We think the architecture is worth exploring anyway.
 
-The parallelism is real. Spawning 25 sub-agents that each explore a different module of a large codebase, in parallel, each with isolated file access — that requires per-agent sandboxes. The recursive structure means the tree's shape adapts to the problem. A simple task stays flat. A complex task grows deep and wide, because the agents *decide* to make it so.
+The parallelism is real. Spawning 25 subagents that each explore a different module of a large codebase, in parallel, each with isolated file access — you need per-agent sandboxes for that. The recursive structure means the tree's shape adapts to the problem. A simple task stays flat. A complex task grows deep and wide, because the agents *decide* to make it so.
 
-Single-agent systems are the practical default. As models get better at decomposition and delegation, the recursive pattern becomes the natural one. We build the infrastructure now.
+Single-agent systems are the practical default. As models get better at decomposition and delegation, the recursive pattern becomes more natural. This repo is the infrastructure for when that happens.
