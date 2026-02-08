@@ -95,7 +95,7 @@ Change these settings to control how subagents are created and how they are allo
 
 ```yaml
 model:
-  name: "claude-sonnet-4-5-20250514"
+  name: "claude-sonnet-4-5"
   temperature: 0.0
   max_tokens: 16384
 rlm:
