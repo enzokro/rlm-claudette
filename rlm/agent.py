@@ -178,6 +178,8 @@ class RLMAgent:
         rlm_query = self._make_rlm_query()
 
         def rlm_query_batched(tasks: list[str]) -> list[str]:
+            if not tasks:
+                return []
             results = [""] * len(tasks)
             with ThreadPoolExecutor(max_workers=min(10, len(tasks))) as executor:
                 future_to_idx = {
@@ -212,4 +214,4 @@ class RLMAgent:
         return edit_file
 
     def _is_timeout(self) -> bool:
-        return (time.time() - self._start_time) > self._config.rlm.global_timeout
+        return (time.time() - self._start_time) > self._config.rlm.agent_timeout

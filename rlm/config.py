@@ -19,7 +19,7 @@ class RLMConfig:
     """RLM agent runtime configuration."""
     max_sandboxes: int = 50
     max_iterations: int = 50
-    global_timeout: int = 3600
+    agent_timeout: int = 3600
     result_truncation_limit: int = 10000
     max_depth: int = 5
 

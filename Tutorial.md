@@ -458,7 +458,7 @@ class ModelConfig:
 class RLMConfig:
     max_sandboxes: int = 50
     max_iterations: int = 50
-    global_timeout: int = 3600
+    agent_timeout: int = 3600
     result_truncation_limit: int = 10000
     max_depth: int = 5
 
@@ -474,7 +474,7 @@ class Config:
 |---------|---------|-----------------|
 | `max_sandboxes` | 50 | Total subagents across the entire tree |
 | `max_iterations` | 50 | Max REPL iterations per agent |
-| `global_timeout` | 3600 | Agent timeout in seconds |
+| `agent_timeout` | 3600 | Per-agent timeout in seconds |
 | `result_truncation_limit` | 10000 | Max characters before truncating subagent results |
 | `max_depth` | 5 | Maximum recursion depth |
 

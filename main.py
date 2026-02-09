@@ -25,7 +25,9 @@ def _prepare_source(repo_or_path: str, branch: str | None, commit: str | None) -
     """Clone a git URL or validate a local path. Returns source directory path."""
     if _is_git_url(repo_or_path):
         tmpdir = tempfile.mkdtemp(prefix="rlm-clone-")
-        cmd = ["git", "clone", "--depth=1"]
+        cmd = ["git", "clone"]
+        if not commit:
+            cmd.append("--depth=1")
         if branch:
             cmd.extend(["--branch", branch])
         cmd.extend([repo_or_path, tmpdir])

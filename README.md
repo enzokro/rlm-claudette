@@ -1,6 +1,6 @@
 # rlm-claudette
 
-An RLM agent system built on [claudette](https://github.com/AnswerDotAI/claudette). It implements the unlimitted recursion depth [explored by the Daytona team](https://www.daytona.io/docs/en/recursive-language-models/). 
+An RLM agent system built on [claudette](https://github.com/AnswerDotAI/claudette). It implements the unlimited recursion depth [explored by the Daytona team](https://www.daytona.io/docs/en/recursive-language-models/). 
 
 This repo aims to be both a full, working RLM system and a good learning tool.
 
@@ -95,13 +95,13 @@ Change these settings to control how subagents are created and how they are allo
 
 ```yaml
 model:
-  name: "claude-sonnet-4-5"
+  name: "claude-sonnet-4-5-20250514"
   temperature: 0.0
   max_tokens: 16384
 rlm:
   max_sandboxes: 50
   max_iterations: 50
-  global_timeout: 3600
+  agent_timeout: 3600
   result_truncation_limit: 10000
   max_depth: 5
 ```
@@ -152,7 +152,7 @@ CORE CONCEPTS
    - Main orchestrator managing overall task execution
    - Coordinates sub-agents and synthesizes results
    - Has access to REPL for Python code execution
-   - Manages token budget and execution depth
+   - Manages execution depth
 
 2. SUB-AGENTS
    - Specialized agents spawned by root agent
@@ -231,7 +231,6 @@ AVAILABLE FUNCTIONS:
 
 EXECUTION CONSTRAINTS:
 • Depth limit: 0/5 (can go 5 levels deep)
-• Token budget: 200,000 tokens
 • Output truncation: ~10,000 characters per execution
 • REPL persistence: Variables carry across code blocks
 
@@ -291,12 +290,6 @@ new_content = Path("file.py").read_text()
 ═════════════════════════════════════════════════════════════════════════════════
 ADVANCED FEATURES
 ═════════════════════════════════════════════════════════════════════════════════
-
-TOKEN BUDGET MANAGEMENT:
-• Total budget: 200,000 tokens
-• Tracked across all operations
-• Efficient delegation reduces token usage
-• Parallel execution saves tokens vs. sequential
 
 EXECUTION DEPTH:
 • Current depth: 0/5
@@ -393,7 +386,6 @@ It enables:
 • Flexible delegation of work to specialized sub-agents
 • Integration with Python REPL for code execution
 • File manipulation and system command execution
-• Token budget management for cost control
 • Structured workflow for complex problem-solving
 
 The framework is designed for:
@@ -480,4 +472,4 @@ rlm: Completed in 1 iterations (depth 0)
 ## References
 - [Recursive Language Models](https://arxiv.org/abs/2512.24601) (Zhang, Kraska, Khattab) 
 - [Prime Intellect RLM Extension](https://www.primeintellect.ai/blog/rlm)
-- [Daytona Unlimitted Recursion RLM post](https://www.daytona.io/docs/en/recursive-language-models/)
+- [Daytona Unlimited Recursion RLM post](https://www.daytona.io/docs/en/recursive-language-models/)
